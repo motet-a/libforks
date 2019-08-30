@@ -3,7 +3,7 @@
 IO.puts "<!-- AUTOMATICALLY GENERATED DO NOT EDIT -->"
 IO.puts ""
 
-Path.join(__DIR__, "libfork.h")
+Path.join(__DIR__, "libforks.h")
 |> File.read!
 |> String.split("\n")
 |> Enum.reject(fn l -> String.ends_with?(l, "// no doc") end)

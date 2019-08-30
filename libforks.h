@@ -26,9 +26,9 @@
 // calls to `fork(2)`.
 //
 // Fork servers are used in the real world by a few programs including
-// CPython and the Erlang Run-Time System, but they use their own
-// implementation. This library is basically the same thing bundled
-// to be reusable in other programs.
+// CPython and the Erlang Run-Time System, but they have their own
+// specific implementation. This library is basically the same thing
+// bundled to be reusable in other programs.
 //
 // This library is written in C99 (hey, it’s been 20 years!) and
 // will not compile in C89.
@@ -57,7 +57,8 @@ extern "C" {                // no doc
 // ## Data types
 
 typedef struct { void *private; } libforks_ServerConn;
-// Represents a connection to a fork server.
+// Represents a connection to a fork server. Must be initialized
+// by `libfork_start` before being used in other functions.
 
 typedef struct {
   pid_t pid; // Child process pid
@@ -85,15 +86,16 @@ typedef enum {
 //
 // ## Functions
 //
-// TODO Talk about thread-safety. Write some examples and tests. I
-// don’t think that all the functions are thread-safe (they must be protected by mutexes).
+// TODO: Talk about thread-safety. Write some examples and tests. I
+// don’t think that all the functions are thread-safe (they must be
+// protected by mutexes).
 
 libforks_Result libforks_start(libforks_ServerConn *conn_ptr);
 // Start the fork server.
 //
-// This function initializes an uninitialized fork handle pointed
-// to by `fork_server_handle`.
-// Most of the following functions need an initialized fork server handle.
+// This function initializes the `ServerConn` struct pointed to by
+// `conn_ptr`. Most of the following functions need an initialized
+// `ServerConn`.
 //
 // Child processes will be forked from this point so it’s a bit like
 // if a copy of the calling process will be saved and frozen here
@@ -108,11 +110,17 @@ libforks_Result libforks_start(libforks_ServerConn *conn_ptr);
 // -----
 
 libforks_Result libforks_kill_all(libforks_ServerConn conn, int signal);
-// Send the given signal to all the running children
+// Send the given signal to all the running children.
 
 // -----
 
-libforks_Result libforks_wait(libforks_ServerConn conn, pid_t pid, int *stat_loc, int options, struct rusage *rusage);
+libforks_Result libforks_wait(
+  libforks_ServerConn conn,
+  pid_t pid,
+  int *stat_loc, // out
+  int options,
+  struct rusage *rusage // out
+);
 // Wait until the specified child processes exit.
 //
 // TODO
@@ -125,14 +133,14 @@ libforks_Result libforks_wait_all(libforks_ServerConn conn);
 
 // -----
 
-libforks_Result libforks_stop_server_only(libforks_ServerConn conn);
-// Stop the fork server. Does not stop running children!
+libforks_Result libforks_stop(libforks_ServerConn conn, bool wait);
+// Stop the fork server and send SIGTERM to every child process.
 //
 // This function invalidates the given forker handle. It must be called
 // from the process that started the fork server.
 
-libforks_Result libforks_stop(libforks_ServerConn conn, bool wait);
-// Stop the fork server and send SIGTERM to every child process.
+libforks_Result libforks_stop_server_only(libforks_ServerConn conn);
+// Stop the fork server. Does not stop running children!
 //
 // This function invalidates the given forker handle. It must be called
 // from the process that started the fork server.
@@ -175,12 +183,6 @@ libforks_Result libforks_fork(
 
 // -----
 
-// Low-level utility functions that can be used to transfer PIDs between
-// arbitrary processes. These are a bit unrelated to the previous
-// functions. They are made available because they are used internally.
-
-// max_fd_count: Maximum number of file descriptors to receive. Should
-// match the size of the array at `fds`.
 int libforks_read_socket_fds(
     int socket_fd,
     void *data, size_t length,
@@ -190,6 +192,12 @@ int libforks_write_socket_fds(
     int socket_fd,
     void *data, size_t length,
     const int *fds, size_t fd_count);
+// Low-level utility functions that can be used to transfer PIDs between
+// arbitrary processes. These are a bit unrelated to the previous
+// functions. They are made available because they are used internally.
+//
+// `max_fd_count`: Maximum number of file descriptors to receive. Should
+// match the size of the array at `fds`.
 
 #ifdef __cplusplus    // no doc
 }                     // no doc
