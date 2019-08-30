@@ -162,7 +162,7 @@ returns immediately, even if some children have not exited yet.
 
 Use `libforks_kill_all` to send a different signal that SIGTERM.
 
-This function invalidates the given forker handle. It must be called
+This function invalidates the given ServerConn. It must be called
 from the process that started the fork server.
 
 ```c
@@ -171,7 +171,7 @@ libforks_Result libforks_stop_server_only(libforks_ServerConn conn);
 
 Stop the fork server. Does not stop running children!
 
-This function invalidates the given forker handle. It must be called
+This function invalidates the given ServerConn. It must be called
 from the process that started the fork server.
 
 -----
