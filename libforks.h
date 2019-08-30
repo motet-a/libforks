@@ -1,4 +1,4 @@
-// *Warning: still a work in progress, this library is experimental*
+// ⚠️*: still a work in progress, this library is experimental*
 //
 // libforks: A solution to use fork(2) in multithreaded programs
 //
@@ -64,7 +64,8 @@ typedef struct {
   pid_t pid; // Child process pid
   int wait_status; // Status retured by `waitpid(2)`
 } libforks_ExitEvent;
-// Event emitted when a child process exits.
+// Event emitted on the dedicated file descriptor when a child
+// process exits. See `libforks_fork` for further details.
 
 // -----
 
@@ -79,8 +80,9 @@ typedef enum {
   libforks_WAIT_ERROR = -7,
   libforks_STOP_ERROR = -8,
   libforks_PIPE_CREATION_ERROR = -9,
-  // TODO
 } libforks_Result;
+// Errors codes used by this library. More codes may be added in
+// the future. `libforks_OK` means “no error”.
 
 // -----
 //
@@ -130,11 +132,20 @@ libforks_Result libforks_wait(
 
 libforks_Result libforks_wait_all(libforks_ServerConn conn);
 // TODO
+//
+// Warning: The fork server is single-threaded and will be entirely
+// blocked until this function returns.
 
 // -----
 
 libforks_Result libforks_stop(libforks_ServerConn conn, bool wait);
 // Stop the fork server and send SIGTERM to every child process.
+//
+// If `wait` is true, this function does not return until all the
+// children have actually exited. If `wait` is false, this function
+// returns immediately, even if some children have not exited yet.
+//
+// Use `libforks_kill_all` to send a different signal that SIGTERM.
 //
 // This function invalidates the given forker handle. It must be called
 // from the process that started the fork server.
