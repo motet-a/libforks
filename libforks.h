@@ -146,6 +146,9 @@ libforks_Result libforks_fork(
 // with `socket_fd_ptr`. The child process will exit if this function
 // returns.
 //
+// Consider destroying the `ServerConn` object of the child process with
+// `libforks_free_conn` if the child does not use it.
+//
 // The `entrypoint` function pointer must be available when `libforks_start`
 // was called so if you want to load it in the caller process with something
 // like `dlopen`, do it before `libforks_start`. Or do it after the fork
