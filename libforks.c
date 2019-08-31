@@ -367,6 +367,7 @@ static void handle_stop_all_request(
   }
 
   if (req->u.stop_all_request.wait) {
+    serv_DEBUG("waiting until children exit");
     int status;
     if (wait(&status) == -1) {
       if (errno != ECHILD) {
@@ -374,6 +375,7 @@ static void handle_stop_all_request(
         serv_panic();
       }
     }
+    serv_DEBUG("all children exited\n");
   }
 
   serv_send(
@@ -385,6 +387,17 @@ static void handle_stop_all_request(
 
   serv_DEBUG("goodbye!\n");
   exit(0);
+}
+
+static void serv_uninstall_signal_handler(int signal) {
+  struct sigaction sa;
+  sa.sa_handler = SIG_DFL;
+  sa.sa_flags = 0;
+  sigemptyset(&sa.sa_mask);
+  if (sigaction(signal, &sa, 0) == -1) {
+      serv_print_errno(NULL);
+      serv_panic();
+  }
 }
 
 static void handle_fork_request(
@@ -408,8 +421,8 @@ static void handle_fork_request(
       serv_panic();
     }
   }
-  int user_socket_parent = user_sockets[0];
-  int user_socket_child = user_sockets[1];
+  int user_socket_parent = user_sockets[0]; // parent end
+  int user_socket_child = user_sockets[1]; // child end
 
   pid_t child_pid = fork();
   if (child_pid == -1) {
@@ -437,6 +450,9 @@ static void handle_fork_request(
     }
     close(serv_exit_pipe_in);
 
+    serv_uninstall_signal_handler(SIGTERM);
+    serv_uninstall_signal_handler(SIGCHLD);
+
     ServerConn child_conn = {
       .incoming_socket_in = incoming_socket_in,
       .outgoing_socket_out = outgoing_sockets[1],
@@ -446,7 +462,7 @@ static void handle_fork_request(
       .private = &child_conn,
     };
 
-    req->u.fork_request.entrypoint(conn_p, -1);
+    req->u.fork_request.entrypoint(conn_p, user_socket_child);
     exit(0);
   }
 
@@ -523,11 +539,11 @@ static void serv_main(serv_Client *first_client, int incoming_socket_out, int in
   // fork server and its children properly.
   struct sigaction sa;
   sa.sa_handler = SIG_IGN;
-  sigemptyset(&sa.sa_mask);
   sa.sa_flags = 0;
+  sigemptyset(&sa.sa_mask);
   if (sigaction(SIGTERM, &sa, 0) == -1) {
       serv_print_errno(NULL);
-      exit(1);
+      serv_panic();
   }
 
   // Stay notified of child exits through a SIGCHLD handler and `exit_pipe`

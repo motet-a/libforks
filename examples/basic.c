@@ -17,7 +17,6 @@ static void child_main(libforks_ServerConn conn, int socket_fd) {
 
 int main() {
   libforks_ServerConn conn;
-
   assert(libforks_start(&conn) == libforks_OK);
 
   assert(libforks_fork(
