@@ -652,13 +652,13 @@ libforks_Result libforks_start(libforks_ServerConn *conn_ptr) {
     goto del_incoming_sockets;
   }
 
-  int child_pid = fork();
-  if (child_pid == -1) {
+  int server_pid = fork();
+  if (server_pid == -1) {
     res = libforks_FORK_ERROR;
     goto del_sockets;
   }
 
-  if (child_pid == 0) {
+  if (server_pid == 0) {
     // this is the server process
     close(outgoing_sockets[1]);
 
@@ -679,19 +679,22 @@ libforks_Result libforks_start(libforks_ServerConn *conn_ptr) {
 
   ServerConn *conn = malloc(sizeof(ServerConn));
   if (!conn) {
-    perror("malloc");
-    abort();
+    res = libforks_MALLOC_ERROR;
+    goto kill_server;
   }
 
   close(incoming_sockets[1]);
   close(outgoing_sockets[0]);
-  conn->server_pid = child_pid;
+  conn->server_pid = server_pid;
   conn->incoming_socket_in = incoming_sockets[0];
   conn->outgoing_socket_out = outgoing_sockets[1];
 
   conn_ptr->private = conn;
   res = libforks_OK;
   goto exit;
+
+kill_server:
+  kill(server_pid, SIGKILL);
 
 del_sockets:
   close(outgoing_sockets[0]);
