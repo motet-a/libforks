@@ -8,6 +8,8 @@ packages:
 sources:
   - https://git.sr.ht/~moteta/libforks
   - https://git.sr.ht/~sircmpwn/annotatec
+secrets:
+  - f21baa04-0d45-473e-b6f4-d431c55b358c # ~/upload-annotations
 tasks:
   - build_and_test: |
       cd libforks
