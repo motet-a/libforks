@@ -1,5 +1,6 @@
 #include "./tests.h"
 #include <sys/dir.h>
+#include <errno.h>
 
 // Test runner program.
 
@@ -19,6 +20,7 @@ int main() {
     }
 
     printf("testing %s...", entry->d_name);
+    fflush(stdout);
     char exec_path[strlen(entry->d_name) + 3];
     check(snprintf(exec_path, sizeof exec_path, "./%s", entry->d_name) != -1);
 
@@ -52,10 +54,15 @@ int main() {
       abort();
     }
 
-    // wait for the whole process group
-    if (waitpid(-child_pid, &wait_status, WNOHANG) > 0) {
-      snprintf(failure, sizeof failure, "children are still running");
-      killpg(child_pid, SIGKILL);
+    // kill the whole process group
+    int kill_res = killpg(child_pid, SIGKILL);
+    if (kill_res == 0) {
+      snprintf(failure, sizeof failure, "children were still running");
+    } else {
+      if (errno != ESRCH) {
+        perror("killpg");
+        abort();
+      }
     }
 
     if (*failure) {

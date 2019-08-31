@@ -45,5 +45,8 @@ int main() {
   check(close(pipe_fds[0]) == 0);
 
   check(write(pipe_fds[1], "hello", 6) == 6);
+
+  int wait_status;
+  check(wait(&wait_status) != -1);
 }
 
