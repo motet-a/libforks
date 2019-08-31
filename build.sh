@@ -18,7 +18,7 @@ clean() {
 
 
 build_and_test() {
-  CFLAGS="$CFLAGS -W -Wall -std=c99 -pedantic -I."
+  CFLAGS="$CFLAGS -W -Wall -std=c99 -I."
   CFLAGS="$CFLAGS -g -fsanitize=address"
 
   for p in $(test_paths)  $(example_paths)

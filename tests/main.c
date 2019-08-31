@@ -1,5 +1,4 @@
 #include "./tests.h"
-#include <sys/types.h>
 #include <sys/dir.h>
 
 // Test runner program.

@@ -48,9 +48,10 @@
 extern "C" {                // no doc
 #endif                      // no doc
 
+#include <sys/types.h>      // for `pid_t` // no doc
+#include <sys/resource.h>   // for `struct rusage` // no doc
 #include <stdbool.h>        // no doc
 #include <unistd.h>         // no doc
-#include <sys/resource.h>   // for `struct rusage` // no doc
 
 // # Data types
 

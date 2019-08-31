@@ -1,3 +1,5 @@
+#define _DEFAULT_SOURCE
+
 #include "../libforks.h"
 
 #include <fcntl.h>
@@ -8,6 +10,7 @@
 #include <string.h>
 #include <signal.h>
 #include <unistd.h>
+#include <sys/wait.h>
 #include <sys/socket.h>
 
 #define check(e) ((void)(e ? (void)0 : check_failure(#e, __FILE__, __LINE__)))

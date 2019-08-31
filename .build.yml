@@ -1,0 +1,10 @@
+# https://man.sr.ht/tutorials/getting-started-with-builds.md
+
+image: debian/stable
+sources:
+  - https://git.sr.ht/~moteta/libforks
+tasks:
+  - setup: |
+      cd libforks
+      ./build.sh
+
