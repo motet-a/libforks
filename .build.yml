@@ -23,7 +23,7 @@ tasks:
 
   - annotations: |
       cd ~/libforks
-      xargs annotatec -gC 'cpp -std=c99 -I.' \
+      annotatec -gC 'cpp -std=c99 -I.' \
         libforks.c \
         >annotations.json
       ~/upload-annotations annotations.json moteta libforks
