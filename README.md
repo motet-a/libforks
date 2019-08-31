@@ -205,8 +205,6 @@ The fork server will not forget this process and exit file
 descriptors will continue to work (i.e. the parent will be
 notified when this process will exit).
 
-TODO: Implement and test
-
 -----
 
 ```c
