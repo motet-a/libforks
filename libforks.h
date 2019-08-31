@@ -39,7 +39,17 @@
 
 // # Installation
 //
-// TODO: Talk about compiling the SQLite-like single source file
+// You can fetch the sources from GitHub or sourcehut:
+//
+//   - https://github.com/motet-a/libforks
+//   - https://git.sr.ht/~moteta/libforks
+//
+// Since this small library consists of two source files, `libforks.c`
+// and `libforks.h`, you can compile your code with it à la SQLite:
+//
+// ```
+// cc -Ilibforks/ myprogram.c libforks/libforks.c
+// ```
 
 #ifndef LIBFORK_H_          // no doc
 #define LIBFORK_H_          // no doc
