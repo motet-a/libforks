@@ -350,6 +350,18 @@ static void serv_sigchld_handler(int sig_) {
   errno = prev_errno;
 }
 
+static void serv_do_stop(serv_Client *sender_client) {
+  serv_send(
+    sender_client->outgoing_socket_in,
+    (ServerMessage){
+      .type = ServerMessageType_STOP_SUCCESS,
+    }
+  );
+
+  serv_DEBUG("goodbye!\n");
+  exit(0);
+}
+
 static void handle_stop_all_request(
     const ClientMessage *req,
     serv_Client **first_client_ptr,
@@ -378,15 +390,7 @@ static void handle_stop_all_request(
     serv_DEBUG("all children exited\n");
   }
 
-  serv_send(
-    sender_client->outgoing_socket_in,
-    (ServerMessage){
-      .type = ServerMessageType_STOP_SUCCESS,
-    }
-  );
-
-  serv_DEBUG("goodbye!\n");
-  exit(0);
+  serv_do_stop(sender_client);
 }
 
 static void serv_uninstall_signal_handler(int signal) {
@@ -614,6 +618,8 @@ static void serv_main(serv_Client *first_client, int incoming_socket_out, int in
 
       if (req.type == ClientMessageType_STOP_ALL_REQUEST) {
         handle_stop_all_request(&req, &first_client, client);
+      } else if (req.type == ClientMessageType_STOP_SERVER_ONLY_REQUEST) {
+        serv_do_stop(client);
       } else if (req.type == ClientMessageType_FORK_REQUEST) {
         handle_fork_request(
           &req,
@@ -764,42 +770,8 @@ libforks_Result libforks_fork(
   return libforks_OK;
 }
 
-
-libforks_Result libforks_stop_server_only(libforks_ServerConn conn_p) {
-  ServerConn *conn = conn_p.private;
-  assert(conn->server_pid == getpid());
-
-  ClientMessage req = {
-    .type = ClientMessageType_STOP_SERVER_ONLY_REQUEST,
-    .pid = getpid(),
-  };
-
-  if (write(conn->incoming_socket_in, &req, sizeof req) != sizeof req) {
-    return libforks_WRITE_ERROR;
-  }
-
-  // TODO
-
-  return libforks_OK;
-}
-
-libforks_Result libforks_stop(libforks_ServerConn conn_p, bool wait) {
-  ServerConn *conn = conn_p.private;
-
-  ClientMessage req = {
-    .type = ClientMessageType_STOP_ALL_REQUEST,
-    .pid = getpid(),
-    .u = {
-      .stop_all_request = {
-        .wait = wait
-      },
-    },
-  };
-
-  if (write(conn->incoming_socket_in, &req, sizeof req) != sizeof req) {
-    return libforks_WRITE_ERROR;
-  }
-
+// Reads the server response and waits until the server exits
+static libforks_Result finalize_stop(ServerConn *conn) {
   ServerMessage res;
   int read_res = read(conn->outgoing_socket_out, &res, sizeof res);
   if (read_res != sizeof res) {
@@ -815,7 +787,43 @@ libforks_Result libforks_stop(libforks_ServerConn conn_p, bool wait) {
 
   assert(WIFEXITED(status) || WIFSIGNALED(status));
 
+  close(conn->incoming_socket_in);
+  close(conn->outgoing_socket_out);
   free(conn);
   return libforks_OK;
+}
+
+libforks_Result libforks_stop_server_only(libforks_ServerConn conn_p) {
+  ServerConn *conn = conn_p.private;
+
+  ClientMessage req = {
+    .type = ClientMessageType_STOP_SERVER_ONLY_REQUEST,
+    .pid = getpid(),
+  };
+
+  if (write(conn->incoming_socket_in, &req, sizeof req) != sizeof req) {
+    return libforks_WRITE_ERROR;
+  }
+
+  return finalize_stop(conn);
+}
+
+libforks_Result libforks_stop(libforks_ServerConn conn_p, bool wait) {
+  ServerConn *conn = conn_p.private;
+
+  ClientMessage req = {
+    .type = ClientMessageType_STOP_ALL_REQUEST,
+    .pid = getpid(),
+    .u = {
+      .stop_all_request = {
+        .wait = wait
+      },
+    },
+  };
+  if (write(conn->incoming_socket_in, &req, sizeof req) != sizeof req) {
+    return libforks_WRITE_ERROR;
+  }
+
+  return finalize_stop(conn);
 }
 

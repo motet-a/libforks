@@ -152,13 +152,13 @@ libforks_Result libforks_stop(libforks_ServerConn conn, bool wait);
 // This function invalidates the given ServerConn. It must be called
 // from the process that started the fork server.
 
+// -----
+
 libforks_Result libforks_stop_server_only(libforks_ServerConn conn);
 // Stop the fork server. Does not stop running children!
 //
 // This function invalidates the given ServerConn. It must be called
 // from the process that started the fork server.
-//
-// TODO: Write tests for this one
 
 // -----
 
