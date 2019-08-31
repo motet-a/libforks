@@ -260,6 +260,14 @@ from the process that started the fork server.
 -----
 
 ```c
+pid_t libforks_get_server_pid(libforks_ServerConn conn);
+```
+
+Returns the process identifier of the fork server.
+
+-----
+
+```c
 int libforks_read_socket_fds(
     int socket_fd,
     void *data, size_t length,
