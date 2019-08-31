@@ -4,8 +4,7 @@ static int pipe_fds[2];
 static int main_process_pid;
 
 static void child_main(libforks_ServerConn conn, int socket_fd) {
-  (void)conn;
-
+  check(libforks_free_conn(conn) == libforks_OK);
   check(close(pipe_fds[0]) == 0);
   check(socket_fd == -1);
   check(getpid() != main_process_pid);

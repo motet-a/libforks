@@ -3,9 +3,9 @@
 int pipe_fds[2];
 
 static void child_main(libforks_ServerConn conn, int socket_fd) {
-  (void)conn;
   (void)socket_fd;
 
+  check(libforks_free_conn(conn) == libforks_OK);
   check(close(pipe_fds[0]) == 0);
   pid_t pid = getpid();
   check(write(pipe_fds[1], (void*)&pid, sizeof pid) == sizeof pid);

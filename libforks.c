@@ -126,15 +126,15 @@ struct serv_Client {
 static int serv_exit_pipe_in;
 
 
-
 #ifndef NDEBUG
-static void checked_close(int fd) {
+static int checked_close(int fd) {
   if (close(fd) != 0) {
     perror("libforks: close");
     abort();
   }
+  return 0;
 }
-#define close(fd) checked_close(fd);
+#define close(fd) checked_close(fd)
 #endif // NDEBUG
 
 
@@ -828,5 +828,14 @@ libforks_Result libforks_stop(libforks_ServerConn conn_p, bool wait) {
   }
 
   return finalize_stop(conn);
+}
+
+libforks_Result libforks_free_conn(libforks_ServerConn conn_p) {
+  ServerConn *conn = conn_p.private;
+  if (close(conn->incoming_socket_in) ||
+      close(conn->outgoing_socket_out)) {
+    return libforks_CLOSE_ERROR;
+  }
+  return libforks_OK;
 }
 

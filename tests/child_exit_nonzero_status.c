@@ -2,8 +2,8 @@
 
 
 static void child_main(libforks_ServerConn conn, int socket_fd) {
-  (void)conn;
   (void)socket_fd;
+  (void)conn;
 
   exit(23);
 }

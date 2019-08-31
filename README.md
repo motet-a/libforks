@@ -76,6 +76,7 @@ typedef enum {
   libforks_WAIT_ERROR = -7,
   libforks_STOP_ERROR = -8,
   libforks_PIPE_CREATION_ERROR = -9,
+  libforks_CLOSE_ERROR = -10,
 } libforks_Result;
 ```
 
@@ -199,8 +200,10 @@ Releases resources used by the `ServerConn` struct.
 
 This function should be used just before calling `execve`.
 
-The fork server will not forget this process. Exit file descriptors
-will continue to work.
+This function does not send any message to the fork server.
+The fork server will not forget this process and exit file
+descriptors will continue to work (i.e. the parent will be
+notified when this process will exit).
 
 TODO: Implement and test
 

@@ -1,8 +1,7 @@
 #include "./tests.h"
 
 static void child_main(libforks_ServerConn conn, int socket_fd) {
-  (void)conn;
-
+  check(libforks_free_conn(conn) == libforks_OK);
   char c;
   check(read(socket_fd, &c, 1) == 1);
   check(c == 'a');
