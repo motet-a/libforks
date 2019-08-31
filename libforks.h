@@ -84,7 +84,7 @@ typedef enum {
 
 // -----
 //
-// # Functions
+// # Basic functions
 //
 // TODO: Talk about thread-safety. Write some examples and tests. I
 // don’t think that all the functions are thread-safe (they must be
@@ -93,7 +93,7 @@ typedef enum {
 // -----
 
 libforks_Result libforks_start(libforks_ServerConn *conn_ptr);
-// Start the fork server.
+// Starts a new fork server.
 //
 // This function initializes the `ServerConn` struct pointed to by
 // `conn_ptr`. Most of the following functions need an initialized
@@ -108,57 +108,6 @@ libforks_Result libforks_start(libforks_ServerConn *conn_ptr);
 // can be shared by many different processes, a process can call
 // this function many times in order to start many different
 // fork servers.
-
-// -----
-
-libforks_Result libforks_kill_all(libforks_ServerConn conn, int signal);
-// Send the given signal to all the running children.
-
-// -----
-
-libforks_Result libforks_wait(
-  libforks_ServerConn conn,
-  pid_t pid,
-  int *stat_loc, // out
-  int options,
-  struct rusage *rusage // out
-);
-// Wait until the specified child processes exit.
-//
-// TODO
-//
-// Warning: The fork server is single-threaded and will be entirely
-// blocked until this function returns.
-
-// -----
-
-libforks_Result libforks_wait_all(libforks_ServerConn conn);
-// TODO
-//
-// Warning: The fork server is single-threaded and will be entirely
-// blocked until this function returns.
-
-// -----
-
-libforks_Result libforks_stop(libforks_ServerConn conn, bool wait);
-// Stop the fork server and send SIGTERM to every child process.
-//
-// If `wait` is true, this function does not return until all the
-// children have actually exited. If `wait` is false, this function
-// returns immediately, even if some children have not exited yet.
-//
-// Use `libforks_kill_all` to send a different signal that SIGTERM.
-//
-// This function invalidates the given ServerConn. It must be called
-// from the process that started the fork server.
-
-// -----
-
-libforks_Result libforks_stop_server_only(libforks_ServerConn conn);
-// Stop the fork server. Does not stop running children!
-//
-// This function invalidates the given ServerConn. It must be called
-// from the process that started the fork server.
 
 // -----
 
@@ -195,6 +144,62 @@ libforks_Result libforks_fork(
 // was called so if you want to load it in the caller process with something
 // like `dlopen`, do it before `libforks_start`. Or do it after the fork
 // in the child process.
+
+// -----
+
+libforks_Result libforks_stop(libforks_ServerConn conn, bool wait);
+// Stops the fork server and send SIGTERM to every child process.
+//
+// If `wait` is true, this function does not return until all the
+// children have actually exited. If `wait` is false, this function
+// returns immediately, even if some children have not exited yet.
+//
+// Use `libforks_kill_all` to send a different signal that SIGTERM.
+//
+// This function invalidates the given ServerConn. It must be called
+// from the process that started the fork server.
+
+
+// -----
+
+// # Advanced functions
+
+libforks_Result libforks_kill_all(libforks_ServerConn conn, int signal);
+// Sends the given signal to all the running children.
+
+// -----
+
+libforks_Result libforks_wait(
+  libforks_ServerConn conn,
+  pid_t pid,
+  int *stat_loc, // out
+  int options,
+  struct rusage *rusage // out
+);
+// Suspends execution until the specified child processes exit.
+//
+// TODO
+//
+// Warning: The fork server is single-threaded and will be entirely
+// blocked until this function returns.
+
+// -----
+
+libforks_Result libforks_wait_all(libforks_ServerConn conn);
+// TODO
+//
+// Warning: The fork server is single-threaded and will be entirely
+// blocked until this function returns.
+
+// -----
+
+libforks_Result libforks_stop_server_only(libforks_ServerConn conn);
+// Stops the fork server. Does not stop running children!
+//
+// This function can be used to daemonize a child process.
+//
+// This function invalidates the given ServerConn. It must be called
+// from the process that started the fork server.
 
 // -----
 
