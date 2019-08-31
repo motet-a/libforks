@@ -49,7 +49,7 @@ typedef enum {
   ClientMessageType_FORK_REQUEST,
   ClientMessageType_STOP_SERVER_ONLY_REQUEST,
   ClientMessageType_STOP_ALL_REQUEST,
-  ClientMessageType_KILL_REQUEST,
+  ClientMessageType_KILL_ALL_REQUEST,
 } ClientMessageType;
 
 typedef struct {
@@ -63,9 +63,8 @@ typedef struct {
     } fork_request;
 
     struct {
-      pid_t pid;
-      bool wait;
-    } kill_request;
+      int signal;
+    } kill_all_request;
 
     struct {
       bool wait;
@@ -522,6 +521,35 @@ static void serv_handle_fork_request(
   serv_send_fds(parent->outgoing_socket_in, res, fds_to_send, fd_count);
 }
 
+static void serv_handle_kill_all_request(
+    const ClientMessage *req,
+    serv_Client *first_client,
+    serv_Client *sender) {
+  serv_DEBUG("KILL_ALL_REQUEST received\n");
+
+  {
+    serv_Client *c = first_client;
+    while (c) {
+      if (c != sender) { // don’t kill the sender!
+        if (kill(c->pid, req->u.kill_all_request.signal) == -1) {
+          if (errno == ESRCH) {
+            // The process has just exited for some other reason.
+          } else {
+            serv_print_errno("kill");
+            serv_panic();
+          }
+        }
+      }
+
+      c = c->next;
+    }
+  }
+
+  ServerMessage res = {
+    .type = ServerMessageType_KILL_SUCCESS,
+  };
+  serv_send(sender->outgoing_socket_in, res);
+}
 
 // The main loop of the fork server.
 __attribute__((noreturn))
@@ -614,17 +642,19 @@ static void serv_main(serv_Client *first_client, int incoming_socket_out, int in
     if (poll_fds[1].revents) {
       ClientMessage req = serv_recv(incoming_socket_out);
 
-      serv_Client *client = serv_find_client(first_client, req.pid);
+      serv_Client *sender = serv_find_client(first_client, req.pid);
 
       if (req.type == ClientMessageType_STOP_ALL_REQUEST) {
-        serv_handle_stop_all_request(&req, &first_client, client);
+        serv_handle_stop_all_request(&req, &first_client, sender);
       } else if (req.type == ClientMessageType_STOP_SERVER_ONLY_REQUEST) {
-        serv_do_stop(client);
+        serv_do_stop(sender);
+      } else if (req.type == ClientMessageType_KILL_ALL_REQUEST) {
+        serv_handle_kill_all_request(&req, first_client, sender);
       } else if (req.type == ClientMessageType_FORK_REQUEST) {
         serv_handle_fork_request(
           &req,
           &first_client,
-          client,
+          sender,
           incoming_socket_out,
           incoming_socket_in
         );
@@ -836,6 +866,32 @@ libforks_Result libforks_free_conn(libforks_ServerConn conn_p) {
       close(conn->outgoing_socket_out)) {
     return libforks_CLOSE_ERROR;
   }
+  return libforks_OK;
+}
+
+libforks_Result libforks_kill_all(libforks_ServerConn conn_p, int signal) {
+  ServerConn *conn = conn_p.private;
+
+  ClientMessage req = {
+    .type = ClientMessageType_KILL_ALL_REQUEST,
+    .pid = getpid(),
+    .u = {
+      .kill_all_request = {
+        .signal = signal
+      },
+    },
+  };
+  if (write(conn->incoming_socket_in, &req, sizeof req) != sizeof req) {
+    return libforks_WRITE_ERROR;
+  }
+
+  ServerMessage res;
+  int read_res = read(conn->outgoing_socket_out, &res, sizeof res);
+  if (read_res != sizeof res) {
+    return libforks_READ_ERROR;
+  }
+
+  assert(res.type == ServerMessageType_KILL_SUCCESS);
   return libforks_OK;
 }
 

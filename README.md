@@ -175,7 +175,8 @@ the process and `libforks_fork` restores it.
 libforks_Result libforks_stop(libforks_ServerConn conn, bool wait);
 ```
 
-Stops the fork server and send SIGTERM to every child process.
+Stops the fork server and send SIGTERM to every child process
+except the caller.
 
 If `wait` is true, this function does not return until all the
 children have actually exited. If `wait` is false, this function
@@ -211,9 +212,7 @@ notified when this process will exit).
 libforks_Result libforks_kill_all(libforks_ServerConn conn, int signal);
 ```
 
-Sends the given signal to all the running children.
-
-TODO: Implement and test
+Sends the given signal to all the running children (except the caller).
 
 -----
 
