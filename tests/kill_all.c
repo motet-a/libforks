@@ -4,7 +4,6 @@ static int child_socket_fd;
 
 static void child_handle_sigusr1(int n) {
   (void)n;
-  puts("received signal");
   check(write(child_socket_fd, "s", 1) == 1);
 }
 

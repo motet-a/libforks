@@ -67,6 +67,8 @@ int main() {
     }
   }
 
+  check(closedir(dir) == 0);
+
   return exit_status;
 }
 
