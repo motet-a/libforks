@@ -66,7 +66,6 @@ typedef struct {
     struct {
       int signal;
     } kill_all_request;
-
   } u;
 } ClientMessage;
 
@@ -371,6 +370,15 @@ static void serv_handle_stop_all_request(
         serv_panic();
       }
     }
+  }
+
+  if (sender_client->parent) {
+    serv_print_error(
+      "Deadlock detected!\n"
+      "You have called a libforks function from a child process that must be called from the process "
+      "that started the fork server from a child process.\n"
+    );
+    serv_panic();
   }
 
   serv_DEBUG("waiting until children exit");

@@ -59,7 +59,6 @@ extern "C" {                // no doc
 #endif                      // no doc
 
 #include <sys/types.h>      // for `pid_t` // no doc
-#include <sys/resource.h>   // for `struct rusage` // no doc
 #include <stdbool.h>        // no doc
 #include <unistd.h>         // no doc
 
@@ -185,8 +184,9 @@ libforks_Result libforks_stop(libforks_ServerConn conn);
 // does not return until all of them have actually exited. Use
 // `libforks_kill_all` to send a different signal that SIGTERM.
 //
-// This function invalidates the given ServerConn. It should be called
-// from the process that started the fork server.
+// This function invalidates the given ServerConn. It must be called
+// from the process that started the fork server, otherwise it
+// will deadlock.
 
 
 // -----
@@ -207,30 +207,6 @@ libforks_Result libforks_free_conn(libforks_ServerConn conn);
 
 libforks_Result libforks_kill_all(libforks_ServerConn conn, int signal);
 // Sends the given signal to all the running children (except the caller).
-
-// -----
-
-libforks_Result libforks_wait(
-  libforks_ServerConn conn,
-  pid_t pid,
-  int *stat_loc, // out
-  int options,
-  struct rusage *rusage // out
-);
-// Suspends execution until the specified child processes exit.
-//
-// TODO
-//
-// Warning: The fork server is single-threaded and will be entirely
-// blocked until this function returns.
-
-// -----
-
-libforks_Result libforks_wait_all(libforks_ServerConn conn);
-// TODO
-//
-// Warning: The fork server is single-threaded and will be entirely
-// blocked until this function returns.
 
 // -----
 
