@@ -1,11 +1,26 @@
 # https://man.sr.ht/tutorials/getting-started-with-builds.md
+# https://git.sr.ht/~sircmpwn/scdoc/tree/master/.build.yml
 
 image: debian/stable
 sources:
   - https://git.sr.ht/~moteta/libforks
+  - https://git.sr.ht/~sircmpwn/annotatec
 tasks:
-  - setup: |
+  - build_and_test: |
       cd libforks
       export CFLAGS="-fsanitize=address"
       ./build.sh
+
+  - annotatec: |
+      cd annotatec
+      make
+      sudo make install PREFIX=/usr
+
+  - annotations: |
+      cd ~/libfork
+      # that version string, jesus christ
+      find src -name "*.c" | \
+        xargs annotatec -gC 'cpp -std=c99 -I.' \
+        >annotations.json
+      ~/upload-annotations annotations.json sircmpwn scdoc
 
