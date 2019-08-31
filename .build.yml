@@ -5,6 +5,7 @@ image: debian/stable
 packages:
   - flex
   - bison
+  - curl
 sources:
   - https://git.sr.ht/~moteta/libforks
   - https://git.sr.ht/~sircmpwn/annotatec
