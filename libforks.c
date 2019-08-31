@@ -362,7 +362,7 @@ static void serv_do_stop(serv_Client *sender_client) {
   exit(0);
 }
 
-static void handle_stop_all_request(
+static void serv_handle_stop_all_request(
     const ClientMessage *req,
     serv_Client **first_client_ptr,
     serv_Client *sender_client) {
@@ -404,7 +404,7 @@ static void serv_uninstall_signal_handler(int signal) {
   }
 }
 
-static void handle_fork_request(
+static void serv_handle_fork_request(
     const ClientMessage *req,
     serv_Client **first_client_ptr,
     serv_Client *parent,
@@ -617,11 +617,11 @@ static void serv_main(serv_Client *first_client, int incoming_socket_out, int in
       serv_Client *client = serv_find_client(first_client, req.pid);
 
       if (req.type == ClientMessageType_STOP_ALL_REQUEST) {
-        handle_stop_all_request(&req, &first_client, client);
+        serv_handle_stop_all_request(&req, &first_client, client);
       } else if (req.type == ClientMessageType_STOP_SERVER_ONLY_REQUEST) {
         serv_do_stop(client);
       } else if (req.type == ClientMessageType_FORK_REQUEST) {
-        handle_fork_request(
+        serv_handle_fork_request(
           &req,
           &first_client,
           client,
