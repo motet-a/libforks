@@ -283,8 +283,21 @@ Low-level utility functions that can be used to transfer PIDs between
 arbitrary processes. These are a bit unrelated to the previous
 functions. They are made available because they are used internally.
 
-`max_fd_count`: Maximum number of file descriptors to receive. Should
-match the size of the array at `fds`.
+`socket_fd` must be a UNIX socket file descriptor. These functions do
+not work if `socket_fd` is a pipe or a regular file.
+
+`fds` is an array of file descriptors to send or to receive.
+`fd_count` is the number of file descriptors to send.
+
+`max_fd_count` is the maximum number of file descriptors to receive.
+Should match the size of the array at `fds`. The call succeed even if
+`max_fd_count` is greater than the number of file descriptors available
+on the socket. The recommended way to know how many file descriptors
+have been transfered is to fill `fds` with -1 and to check after the call
+how many valid file descriptors have been written to `fds`.
+
+These functions use `sendmsg` and `recvmsg` internally and return
+the same values. On error, -1 is return and `errno` is set.
 
 -----
 
