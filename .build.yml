@@ -20,7 +20,7 @@ tasks:
       sudo make install PREFIX=/usr
 
   - annotations: |
-      cd ~/libfork
+      cd ~/libforks
       # that version string, jesus christ
       find src -name "*.c" | \
         xargs annotatec -gC 'cpp -std=c99 -I.' \
