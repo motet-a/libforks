@@ -9,7 +9,6 @@ static void child_main(libforks_ServerConn conn, int socket_fd) {
   check(close(pipe_fds[0]) == 0);
   check(socket_fd == -1);
   check(getpid() != main_process_pid);
-  sleep(1);
   check(write(pipe_fds[1], "a", 1) == 1);
 }
 
@@ -34,7 +33,7 @@ int main() {
 
   check(libforks_stop(conn, true) == libforks_OK);
 
-  // Make sure that we can read one and only one char written by thte
+  // Make sure that we can read one and only one char written by the
   // child process
   char buffer[16];
   check(read(pipe_fds[0], buffer, sizeof buffer) == 1);
