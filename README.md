@@ -52,7 +52,7 @@ typedef struct { void *private; } libforks_ServerConn;
 ```
 
 Represents a connection to a fork server. Must be initialized
-by `libfork_start` before being used in other functions.
+by `libforks_start` before being used in other functions.
 
 ```c
 typedef struct {
