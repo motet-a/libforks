@@ -2,6 +2,8 @@
 #include <sys/types.h>
 #include <sys/dir.h>
 
+// Test runner program.
+
 int main() {
   DIR *dir = opendir(".");
   check(dir);
@@ -51,8 +53,8 @@ int main() {
       abort();
     }
 
+    // wait for the whole process group
     if (waitpid(-child_pid, &wait_status, WNOHANG) > 0) {
-      // Some children are still running
       snprintf(failure, sizeof failure, "children are still running");
       killpg(child_pid, SIGKILL);
     }

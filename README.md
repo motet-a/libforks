@@ -35,17 +35,15 @@ bundled to be reusable in other programs.
 This library is written in C99 (hey, it’s been 20 years!) and
 will not compile in C89.
 
-## Examples
+# Examples
 
 Please take a look at the `examples/` directory.
 
-TODO: Add more examples.
-
-## Installation
+# Installation
 
 TODO: Talk about compiling the SQLite-like single source file
 
-## Data types
+# Data types
 
 ```c
 typedef struct { void *private; } libforks_ServerConn;
@@ -86,11 +84,13 @@ the future. `libforks_OK` means “no error”.
 
 -----
 
-## Functions
+# Functions
 
 TODO: Talk about thread-safety. Write some examples and tests. I
 don’t think that all the functions are thread-safe (they must be
 protected by mutexes).
+
+-----
 
 ```c
 libforks_Result libforks_start(libforks_ServerConn *conn_ptr);
@@ -139,6 +139,8 @@ TODO
 Warning: The fork server is single-threaded and will be entirely
 blocked until this function returns.
 
+-----
+
 ```c
 libforks_Result libforks_wait_all(libforks_ServerConn conn);
 ```
@@ -173,6 +175,8 @@ Stop the fork server. Does not stop running children!
 
 This function invalidates the given ServerConn. It must be called
 from the process that started the fork server.
+
+TODO: Write tests for this one
 
 -----
 
@@ -235,6 +239,8 @@ functions. They are made available because they are used internally.
 match the size of the array at `fds`.
 
 -----
+
+# License
 
 ```
 Copyright Ericsson AB 1996-2018. All Rights Reserved.
