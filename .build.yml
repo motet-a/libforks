@@ -23,9 +23,8 @@ tasks:
 
   - annotations: |
       cd ~/libforks
-      # that version string, jesus christ
-      find . -name "*.c" | \
-        xargs annotatec -gC 'cpp -std=c99 -I.' \
+      xargs annotatec -gC 'cpp -std=c99 -I.' \
+        libforks.c \
         >annotations.json
       ~/upload-annotations annotations.json moteta libforks
 
