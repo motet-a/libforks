@@ -190,7 +190,7 @@ libforks_Result libforks_fork(
 );
 ```
 
-Forks the process.
+Forks the server process.
 
 If `*pid_ptr` is not NULL, the pid of the new process will be
 written to `*pid_ptr`.

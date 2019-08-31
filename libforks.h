@@ -169,7 +169,7 @@ libforks_Result libforks_fork(
   int *exit_fd_ptr, // out
   void (*entrypoint)(libforks_ServerConn conn, int socket_fd)
 );
-// Forks the process.
+// Forks the server process.
 //
 // If `*pid_ptr` is not NULL, the pid of the new process will be
 // written to `*pid_ptr`.
