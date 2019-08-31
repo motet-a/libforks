@@ -126,13 +126,33 @@ libforks_Result libforks_fork(
 
 Forks the server process.
 
+`conn` must be previously initialized by `libforks_start`.
+
 If `*pid_ptr` is not NULL, the pid of the new process will be
 written to `*pid_ptr`.
+
 If `*exit_fd_ptr` is not NULL, a readable “exit file descriptor”
 will be written to `*exit_fd_ptr`. When the child process will
 exit, a `libforks_ExitEvent` struct will be readable on this file
 descriptor. Functions like `poll(2)` can be used on this file
 descriptor. The caller should close it after use.
+
+If `*socket_fd_ptr` is not NULL, a bidirectional UNIX socket pair
+is allocated and one end is written at this address. The other end
+of the pair is sent to the child process as the second parameter
+of the `entrypoint` function.
+
+The `entrypoint` parameter will be called from the new child process.
+The `conn` parameter is a connection to the server that can be used
+to communicate to the fork server just like the parent process. The
+`socket_fd` parameter is `-1` unless a socket pair has been allocated
+with `socket_fd_ptr`. The child process will exit if this function
+returns.
+
+The `entrypoint` function pointer must be available when `libforks_start`
+was called so if you want to load it in the caller process with something
+like `dlopen`, do it before `libforks_start`. Or do it after the fork
+in the child process.
 
 Of course, this does not behave exactly like a plain old call
 to fork(2):
@@ -142,14 +162,6 @@ and not the caller.
 the time when `libforks_fork` is called, but when `libforks_start`
 was called. In other words, `libforks_start` saves the state of
 the process and `libforks_fork` restores it.
-
-The ServerConn is sent to the new process. The new process can
-use the fork server exactly like the parent, except it should not stop it.
-
-The `entrypoint` function pointer must be available when `libforks_start`
-was called so if you want to load it in the caller process with something
-like `dlopen`, do it before `libforks_start`. Or do it after the fork
-in the child process.
 
 -----
 
@@ -168,15 +180,34 @@ Use `libforks_kill_all` to send a different signal that SIGTERM.
 This function invalidates the given ServerConn. It must be called
 from the process that started the fork server.
 
+TODO: Is the `wait` parameter actually a good idea?
+
 -----
 
 # Advanced functions
+
+```c
+libforks_Result libforks_free_conn(libforks_ServerConn conn);
+```
+
+Releases resources used by the `ServerConn` struct.
+
+This function should be used just before calling `execve`.
+
+The fork server will not forget this process. Exit file descriptors
+will continue to work.
+
+TODO: Implement and test
+
+-----
 
 ```c
 libforks_Result libforks_kill_all(libforks_ServerConn conn, int signal);
 ```
 
 Sends the given signal to all the running children.
+
+TODO: Implement and test
 
 -----
 
