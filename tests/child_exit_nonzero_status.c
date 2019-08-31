@@ -31,7 +31,7 @@ int main() {
   check(WIFEXITED(event.wait_status));
   check(WEXITSTATUS(event.wait_status) == 23);
 
-  check(libforks_stop(conn, true) == libforks_OK);
+  check(libforks_stop(conn) == libforks_OK);
 
   return 0;
 }

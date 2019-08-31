@@ -37,7 +37,7 @@ int main() {
   ); // blocks until the child writes
   check(child_pid == received_child_pid);
 
-  check(libforks_stop(conn, true) == libforks_OK);
+  check(libforks_stop(conn) == libforks_OK);
 
   check(child_pid == received_child_pid);
 

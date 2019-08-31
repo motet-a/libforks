@@ -27,7 +27,7 @@ int main() {
     child_main
   ) == libforks_OK);
 
-  assert(libforks_stop(conn, true) == libforks_OK);
+  assert(libforks_stop(conn) == libforks_OK);
 
   puts("main process exited");
 

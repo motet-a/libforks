@@ -30,7 +30,7 @@ int main() {
     child_main
   ) == libforks_OK);
 
-  check(libforks_stop(conn, true) == libforks_OK);
+  check(libforks_stop(conn) == libforks_OK);
 
   // Make sure that we can read one and only one char written by the
   // child process

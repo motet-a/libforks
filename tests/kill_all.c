@@ -40,7 +40,7 @@ int main() {
   check(read(socket_fd, &c, 1) == 1);
   check(c == 's');
 
-  check(libforks_stop(conn, true) == libforks_OK);
+  check(libforks_stop(conn) == libforks_OK);
   return 0;
 }
 

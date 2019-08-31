@@ -42,7 +42,6 @@ int main() {
     char c;
     int read_res = read(STDIN_FILENO, &c, 1);
     if (read_res == 0) { // EOF
-      assert(libforks_stop(conn, true) == libforks_OK);
       break;
     }
     assert(read_res == 1);
@@ -52,6 +51,7 @@ int main() {
     assert(write(STDOUT_FILENO, &c, 1) == 1);
   }
 
+  assert(libforks_stop(conn) == libforks_OK);
   return 0;
 }
 

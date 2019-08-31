@@ -166,20 +166,16 @@ libforks_Result libforks_fork(
 
 // -----
 
-libforks_Result libforks_stop(libforks_ServerConn conn, bool wait);
-// Stops the fork server and send SIGTERM to every child process
-// except the caller.
+libforks_Result libforks_stop(libforks_ServerConn conn);
+// Sends SIGTERM to every child process except the caller and stops
+// the fork server.
 //
-// If `wait` is true, this function does not return until all the
-// children have actually exited. If `wait` is false, this function
-// returns immediately, even if some children have not exited yet.
+// This function expects that children handle SIGTERM properly and
+// does not return until all of them have actually exited. Use
+// `libforks_kill_all` to send a different signal that SIGTERM.
 //
-// Use `libforks_kill_all` to send a different signal that SIGTERM.
-//
-// This function invalidates the given ServerConn. It must be called
+// This function invalidates the given ServerConn. It should be called
 // from the process that started the fork server.
-//
-// TODO: Is the `wait` parameter actually a good idea?
 
 
 // -----

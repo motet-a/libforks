@@ -66,10 +66,6 @@ typedef struct {
       int signal;
     } kill_all_request;
 
-    struct {
-      bool wait;
-    } stop_all_request;
-
   } u;
 } ClientMessage;
 
@@ -362,7 +358,6 @@ static void serv_do_stop(serv_Client *sender_client) {
 }
 
 static void serv_handle_stop_all_request(
-    const ClientMessage *req,
     serv_Client **first_client_ptr,
     serv_Client *sender_client) {
   serv_DEBUG("STOP_ALL_REQUEST received\n");
@@ -377,17 +372,15 @@ static void serv_handle_stop_all_request(
     }
   }
 
-  if (req->u.stop_all_request.wait) {
-    serv_DEBUG("waiting until children exit");
-    int status;
-    if (wait(&status) == -1) {
-      if (errno != ECHILD) {
-        serv_print_errno("wait");
-        serv_panic();
-      }
+  serv_DEBUG("waiting until children exit");
+  int status;
+  if (wait(&status) == -1) {
+    if (errno != ECHILD) {
+      serv_print_errno("wait");
+      serv_panic();
     }
-    serv_DEBUG("all children exited\n");
   }
+  serv_DEBUG("all children exited\n");
 
   serv_do_stop(sender_client);
 }
@@ -643,9 +636,10 @@ static void serv_main(serv_Client *first_client, int incoming_socket_out, int in
       ClientMessage req = serv_recv(incoming_socket_out);
 
       serv_Client *sender = serv_find_client(first_client, req.pid);
+      assert(sender);
 
       if (req.type == ClientMessageType_STOP_ALL_REQUEST) {
-        serv_handle_stop_all_request(&req, &first_client, sender);
+        serv_handle_stop_all_request(&first_client, sender);
       } else if (req.type == ClientMessageType_STOP_SERVER_ONLY_REQUEST) {
         serv_do_stop(sender);
       } else if (req.type == ClientMessageType_KILL_ALL_REQUEST) {
@@ -841,17 +835,12 @@ libforks_Result libforks_stop_server_only(libforks_ServerConn conn_p) {
   return finalize_stop(conn);
 }
 
-libforks_Result libforks_stop(libforks_ServerConn conn_p, bool wait) {
+libforks_Result libforks_stop(libforks_ServerConn conn_p) {
   ServerConn *conn = conn_p.private;
 
   ClientMessage req = {
     .type = ClientMessageType_STOP_ALL_REQUEST,
     .pid = getpid(),
-    .u = {
-      .stop_all_request = {
-        .wait = wait
-      },
-    },
   };
   if (write(conn->incoming_socket_in, &req, sizeof req) != sizeof req) {
     return libforks_WRITE_ERROR;
