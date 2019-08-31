@@ -104,8 +104,10 @@ This function initializes the `ServerConn` struct pointed to by
 
 Child processes will be forked from this point so it’s a bit like
 if a copy of the calling process will be saved and frozen here
-and revived each time that someone calls `libforks_fork`. The caller
-process should have only one thread.
+and revived each time that someone calls `libforks_fork`.
+
+Only one thread should exist at the time when `libforks_start` is
+called. Threads should be created after the call to `libforks_start`.
 
 One process can start many fork servers and one fork server
 can be shared by many different processes, a process can call
