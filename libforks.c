@@ -380,13 +380,19 @@ static void serv_handle_stop_all_request(
     if (c->pid != sender_client->pid) {
       serv_DEBUG("sending SIGTERM to %d\n", c->pid);
       if (kill(c->pid, SIGTERM) == -1) {
-        serv_print_errno("kill");
-        serv_panic();
+        if (errno != ESRCH) {
+          // ESRCH is normal if the process just exited for some
+          // other reason.
+          serv_print_errno("kill");
+          serv_panic();
+        }
       }
     }
   }
 
   if (sender_client->parent) {
+    // TODO: I wonder if we could remove this restriction if we call
+    // `wait` repeatedly
     serv_print_error(
       "Deadlock detected!\n"
       "You have called a libforks function from a child process that must be called from the process "
