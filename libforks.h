@@ -1,4 +1,4 @@
-// ⚠️*: still a work in progress, this library is experimental*
+// ⚠️  *this library is experimental, breaking changes can happen*
 //
 // libforks: A solution to use fork(2) in multithreaded programs
 //

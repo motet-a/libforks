@@ -1,6 +1,6 @@
 <!-- AUTOMATICALLY GENERATED DO NOT EDIT -->
 
-⚠️*: still a work in progress, this library is experimental*
+⚠️  *this library is experimental, breaking changes can happen*
 
 libforks: A solution to use fork(2) in multithreaded programs
 
@@ -97,10 +97,6 @@ the future. `libforks_OK` means “no error”.
 
 # Basic functions
 
-TODO: Talk about thread-safety. Write some examples and tests. I
-don’t think that all the functions are thread-safe (they must be
-protected by mutexes).
-
 -----
 
 ```c
@@ -181,6 +177,9 @@ the process and `libforks_fork` restores it.
 
 You have to use `shutdown(2)` before `close(2)` on the socket if
 you want the child process to detect that the socket is closed.
+
+This function is thread-safe, it is safe to use it concurrently
+with the same `libfork_ServerConn` shared between multiple threads.
 
 -----
 
