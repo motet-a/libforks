@@ -51,6 +51,7 @@ typedef enum {
   ClientMessageType_STOP_SERVER_ONLY_REQUEST,
   ClientMessageType_STOP_ALL_REQUEST,
   ClientMessageType_KILL_ALL_REQUEST,
+  ClientMessageType_EVAL_REQUEST,
 } ClientMessageType;
 
 typedef struct {
@@ -66,6 +67,10 @@ typedef struct {
     struct {
       int signal;
     } kill_all_request;
+
+    struct {
+      void (*function)(void);
+    } eval_request;
   } u;
 } ClientMessage;
 
@@ -74,6 +79,7 @@ typedef enum {
   ServerMessageType_FORK_FAILURE,
   ServerMessageType_KILL_SUCCESS,
   ServerMessageType_STOP_SUCCESS,
+  ServerMessageType_EVAL_SUCCESS,
 } ServerMessageType;
 
 typedef struct {
@@ -562,6 +568,19 @@ static void serv_handle_kill_all_request(
   serv_send(sender->outgoing_socket_in, res);
 }
 
+static void serv_handle_eval_request(
+    const ClientMessage *req,
+    const serv_Client *sender) {
+  serv_DEBUG("EVAL_REQUEST received\n");
+
+  req->u.eval_request.function();
+
+  ServerMessage res = {
+    .type = ServerMessageType_EVAL_SUCCESS,
+  };
+  serv_send(sender->outgoing_socket_in, res);
+}
+
 // The main loop of the fork server.
 __attribute__((noreturn))
 static void serv_main(serv_Client *first_client, int incoming_socket_out, int incoming_socket_in) {
@@ -637,12 +656,12 @@ static void serv_main(serv_Client *first_client, int incoming_socket_out, int in
 
       serv_Client *child_client = serv_remove_client(&first_client, event.pid);
       if (child_client->exit_fd != -1) {
-        serv_DEBUG("informing parent that %d has exited", event.pid);
-        int write_res = write(child_client->exit_fd, &event, sizeof event);
-        if (write_res == -1) {
-          // TODO: An error might be okay here if the receiving process closed the exit pipe
-          // TODO: Write a test!
+        serv_DEBUG("informing parent that %d has exited\n", event.pid);
+        // there’s no error if the read end of the pipe is closed
+        // by the parent (at least on macOS)
+        if (write(child_client->exit_fd, &event, sizeof event) != sizeof event) {
           serv_print_errno("write");
+          serv_panic();
         }
       }
 
@@ -670,6 +689,8 @@ static void serv_main(serv_Client *first_client, int incoming_socket_out, int in
           incoming_socket_out,
           incoming_socket_in
         );
+      } else if (req.type == ClientMessageType_EVAL_REQUEST) {
+        serv_handle_eval_request(&req, sender);
       } else {
         serv_print_error("Bad message type");
         serv_panic();
@@ -901,4 +922,31 @@ libforks_Result libforks_kill_all(libforks_ServerConn conn_p, int signal) {
   assert(res.type == ServerMessageType_KILL_SUCCESS);
   return libforks_OK;
 }
+
+libforks_Result libforks_eval(libforks_ServerConn conn_p, void (*function)(void)) {
+  ServerConn *conn = conn_p.private;
+
+  ClientMessage req = {
+    .type = ClientMessageType_EVAL_REQUEST,
+    .pid = getpid(),
+    .u = {
+      .eval_request = {
+        .function = function
+      },
+    },
+  };
+  if (write(conn->incoming_socket_in, &req, sizeof req) != sizeof req) {
+    return libforks_WRITE_ERROR;
+  }
+
+  ServerMessage res;
+  int read_res = read(conn->outgoing_socket_out, &res, sizeof res);
+  if (read_res != sizeof res) {
+    return libforks_READ_ERROR;
+  }
+
+  assert(res.type == ServerMessageType_EVAL_SUCCESS);
+  return libforks_OK;
+}
+
 

@@ -225,6 +225,17 @@ pid_t libforks_get_server_pid(libforks_ServerConn conn);
 
 // -----
 
+libforks_Result libforks_eval(
+  libforks_ServerConn conn_p,
+  void (*function)(void)
+);
+// Executes arbitrary code on the server.
+//
+// This is powerful but dangerous, use this only if you know what you
+// are doing.
+
+// -----
+
 int libforks_read_socket_fds(
     int socket_fd,
     void *data, size_t length,
