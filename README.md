@@ -179,6 +179,9 @@ the time when `libforks_fork` is called, but when `libforks_start`
 was called. In other words, `libforks_start` saves the state of
 the process and `libforks_fork` restores it.
 
+You have to use `shutdown(2)` before `close(2)` on the socket if
+you want the child process to detect that the socket is closed.
+
 -----
 
 ```c
