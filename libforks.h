@@ -97,10 +97,6 @@ typedef enum {
 
 
 // # Basic functions
-//
-// TODO: Talk about thread-safety. Write some examples and tests. I
-// don’t think that all the functions are thread-safe (they must be
-// protected by mutexes).
 
 // -----
 
@@ -176,6 +172,9 @@ libforks_Result libforks_fork(
 //
 // You have to use `shutdown(2)` before `close(2)` on the socket if
 // you want the child process to detect that the socket is closed.
+//
+// This function is thread-safe, it is safe to use it concurrently
+// with the same `libfork_ServerConn` shared between multiple threads.
 
 // -----
 

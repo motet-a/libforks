@@ -9,6 +9,8 @@
 // This is a (terribly overengineered) multithreaded fizz buzz program
 // showing how to use libforks with threads
 
+#define MAX 99
+
 static int threads_output_fd;
 static libforks_ServerConn conn;
 
@@ -65,7 +67,7 @@ static void echo_upper(const char *text) {
 
 static void *fizzer_main() {
   char buf[99];
-  for (int i = 1; i < 100; i++) {
+  for (int i = 1; i < MAX; i++) {
     if (i % 3 == 0) {
       snprintf(buf, sizeof buf, "%d fizz\n", i);
       echo_upper(buf);
@@ -77,11 +79,10 @@ static void *fizzer_main() {
 
 static void *buzzer_main() {
   char buf[99];
-  for (int i = 1; i < 100; i++) {
+  for (int i = 1; i < MAX; i++) {
     if (i % 5 == 0) {
       snprintf(buf, sizeof buf, "%d buzz\n", i);
       echo_upper(buf);
-      //dprintf(threads_output_fd, "%d buzz\n", i);
     }
   }
 
