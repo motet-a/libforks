@@ -1,5 +1,7 @@
 #include "./tests.h"
 
+#include <errno.h>
+
 static void child_main(libforks_ServerConn conn, int socket_fd) {
   check(libforks_free_conn(conn) == libforks_OK);
   char c;
@@ -33,7 +35,12 @@ int main() {
   check(read(socket_fd, &c, 1) == 1);
   check(c == 'b');
 
-  kill(child_pid, SIGTERM);
+  while (true) {
+    if (kill(child_pid, 0) == -1) {
+      check(errno == ESRCH);
+      break;
+    }
+  }
 
   return 0;
 }
