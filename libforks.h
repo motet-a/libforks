@@ -179,8 +179,8 @@ libforks_Result libforks_fork(
 // -----
 
 libforks_Result libforks_stop(libforks_ServerConn conn);
-// Sends SIGTERM to every child process except the caller and stops
-// the fork server.
+// Sends SIGTERM to every child process except the caller, wait
+// until they exit and stops the fork server.
 //
 // This function expects that children handle SIGTERM properly and
 // does not return until all of them have actually exited. Use
@@ -198,7 +198,9 @@ libforks_Result libforks_stop(libforks_ServerConn conn);
 libforks_Result libforks_free_conn(libforks_ServerConn conn);
 // Releases resources used by the `ServerConn` struct.
 //
-// This function should be used just before calling `execve`.
+// This function should be used in child processes before
+// calling `execve` in order to close some internal file
+// descriptors.
 //
 // This function does not send any message to the fork server.
 // The fork server will not forget this process and exit file
@@ -208,14 +210,14 @@ libforks_Result libforks_free_conn(libforks_ServerConn conn);
 // -----
 
 libforks_Result libforks_kill_all(libforks_ServerConn conn, int signal);
-// Sends the given signal to all the running children (except the caller).
+// Sends the given signal to any running children (except the caller).
 
 // -----
 
 libforks_Result libforks_stop_server_only(libforks_ServerConn conn);
 // Stops the fork server. Does not stop running children!
 //
-// This function can be used to daemonize a child process.
+// This function can be used to daemonize child processes.
 //
 // This function invalidates the given ServerConn. It must be called
 // from the process that started the fork server.
