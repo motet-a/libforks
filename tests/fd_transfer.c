@@ -9,7 +9,7 @@ int main() {
     close(sockets[1]);
     char c = '\0';
 
-    check(libforks_read_socket_fds(sockets[0], &c, 1, NULL, 0) == 1);
+    check(libforks_read_socket_fds(sockets[0], &c, 1, NULL, 0) == 0);
     check(c == 'b');
 
     int fds[3] = {-1, -1, -1};
@@ -17,7 +17,7 @@ int main() {
       libforks_read_socket_fds(
           sockets[0],
           &c, 1,
-          fds, 2) == 1
+          fds, 2) == 0
     );
     check(c == 'a');
     check(fds[0] > 2);
@@ -28,7 +28,7 @@ int main() {
     check(read(fds[0], buffer, sizeof buffer) > 0);
     check(strcmp(buffer, "hello") == 0);
 
-    check(libforks_read_socket_fds(sockets[0], &c, 1, NULL, 0) == 1);
+    check(libforks_read_socket_fds(sockets[0], &c, 1, NULL, 0) == 0);
     check(c == 'r');
 
     exit(0);
@@ -39,8 +39,8 @@ int main() {
   int pipe_fds[2];
   check(pipe(pipe_fds) == 0);
 
-  check(libforks_write_socket_fds(sockets[1], "b", 1, NULL, 0) == 1);
-  check(libforks_write_socket_fds(sockets[1], "ar", 3, &pipe_fds[0], 1) == 3);
+  check(libforks_write_socket_fds(sockets[1], "b", 1, NULL, 0) == 0);
+  check(libforks_write_socket_fds(sockets[1], "ar", 3, &pipe_fds[0], 1) == 0);
 
   check(close(pipe_fds[0]) == 0);
 

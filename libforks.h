@@ -262,8 +262,9 @@ int libforks_write_socket_fds(
 // have been transfered is to fill `fds` with -1 and to check after the call
 // how many valid file descriptors have been written to `fds`.
 //
-// These functions use `sendmsg` and `recvmsg` internally and return
-// the same values. On error, -1 is return and `errno` is set.
+// On success, these functions return 0. On error, they return -1
+// and set errno. Unlike `read(2)` and `write(2)` they fail with
+// EMSGSIZE if the number of transfered bytes is lower than `length`.
 
 #ifdef __cplusplus    // no doc
 }                     // no doc
