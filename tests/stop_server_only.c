@@ -13,10 +13,11 @@ int main() {
   check(libforks_start(&conn) == libforks_OK);
 
   int socket_fd;
+  int child_pid;
 
   check(libforks_fork(
     conn,
-    NULL, // pid_ptr
+    &child_pid, // pid_ptr
     &socket_fd, // socket_fd_ptr
     NULL, // exit_fd_ptr
     child_main
@@ -31,6 +32,9 @@ int main() {
   char c;
   check(read(socket_fd, &c, 1) == 1);
   check(c == 'b');
+
+  kill(child_pid, SIGTERM);
+
   return 0;
 }
 
