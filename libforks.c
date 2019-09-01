@@ -81,7 +81,7 @@ typedef struct {
   union {
     struct {
       pid_t pid;
-      // exit fd and user socket fd are transmitted in headers along
+      // user socket fd and exit fd are transmitted in headers along
       // this message
     } fork_success;
 
@@ -172,12 +172,20 @@ int libforks_read_socket_fds(
 
   struct cmsghdr *cmsg;
   for (cmsg = CMSG_FIRSTHDR(&msg); cmsg != NULL && max_fd_count; cmsg = CMSG_NXTHDR(&msg, cmsg)) {
-    if (cmsg->cmsg_len == CMSG_LEN(sizeof(int)) &&
-        cmsg->cmsg_level == SOL_SOCKET &&
+    if (cmsg->cmsg_level == SOL_SOCKET &&
         cmsg->cmsg_type == SCM_RIGHTS) {
-      *fds = *(int *)CMSG_DATA(cmsg);
-      fds++;
-      max_fd_count--;
+
+      char *data_end = (char *)cmsg + cmsg->cmsg_len;
+      size_t data_length = data_end - (char *)CMSG_DATA(cmsg);
+      assert(data_length % sizeof(int) == 0);
+      size_t cmsg_fd_count = data_length / sizeof(int);
+
+      int *cmsg_fds = (int *)CMSG_DATA(cmsg);
+      for (size_t i = 0; i < cmsg_fd_count && max_fd_count; i++) {
+        *fds = cmsg_fds[i];
+        fds++;
+        max_fd_count--;
+      }
     }
   }
 
@@ -503,15 +511,16 @@ static void serv_handle_fork_request(
   *first_client_ptr = client;
 
   int fds_to_send[2];
-  int fd_count = 0;
+  size_t fd_count = 0;
 
-  if (exit_out != -1) {
-    fds_to_send[fd_count++] = exit_out;
-  }
   if (user_socket_parent != -1) {
     fds_to_send[fd_count++] = user_socket_parent;
   }
+  if (exit_out != -1) {
+    fds_to_send[fd_count++] = exit_out;
+  }
 
+  serv_DEBUG("sending %d file descriptor(s)\n", (int)fd_count);
   ServerMessage res = {
     .type = ServerMessageType_FORK_SUCCESS,
     .u = {
