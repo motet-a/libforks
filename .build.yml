@@ -6,5 +6,6 @@ sources:
 tasks:
   - setup: |
       cd libforks
+      export CFLAGS="-fsanitize=address"
       ./build.sh
 
