@@ -512,14 +512,14 @@ static void serv_handle_fork_request(
     serv_uninstall_signal_handler(SIGTERM);
     serv_uninstall_signal_handler(SIGCHLD);
 
-    ServerConn child_conn = {
-      .incoming_socket_in = incoming_socket_in,
-      .outgoing_socket_out = outgoing_sockets[1],
-    };
-
-    libforks_ServerConn conn_p = {
-      .private = &child_conn,
-    };
+    ServerConn *child_conn = malloc(sizeof(ServerConn));
+    if (!child_conn) {
+      serv_print_errno("malloc");
+      serv_panic();
+    }
+    child_conn->incoming_socket_in = incoming_socket_in;
+    child_conn->outgoing_socket_out = outgoing_sockets[1];
+    libforks_ServerConn conn_p = {.private = child_conn};
 
     req->u.fork_request.entrypoint(conn_p, user_socket_child);
     exit(0);
@@ -933,6 +933,7 @@ libforks_Result libforks_free_conn(libforks_ServerConn conn_p) {
       close(conn->outgoing_socket_out)) {
     return libforks_CLOSE_ERROR;
   }
+  free(conn);
   return libforks_OK;
 }
 
