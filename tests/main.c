@@ -48,8 +48,8 @@ int main() {
       if (WEXITSTATUS(wait_status) != 0) {
         snprintf(failure, sizeof failure, "exited with status %d", WEXITSTATUS(wait_status));
       }
-    } else if (WIFSIGNALED(child_pid)) {
-      snprintf(failure, sizeof failure, "received signal");
+    } else if (WIFSIGNALED(wait_status)) {
+      snprintf(failure, sizeof failure, "received signal %d", WTERMSIG(wait_status));
     } else {
       abort();
     }

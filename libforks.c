@@ -77,7 +77,6 @@ typedef enum {
   ServerMessageType_FORK_SUCCESS,
   ServerMessageType_FORK_FAILURE,
   ServerMessageType_KILL_SUCCESS,
-  ServerMessageType_STOP_SUCCESS,
   ServerMessageType_EVAL_SUCCESS,
 } ServerMessageType;
 
@@ -406,18 +405,6 @@ static void serv_sigchld_handler(int sig_) {
   errno = prev_errno;
 }
 
-static void serv_do_stop(serv_Client *sender_client) {
-  serv_send(
-    sender_client->socket,
-    (ServerMessage){
-      .type = ServerMessageType_STOP_SUCCESS,
-    }
-  );
-
-  serv_DEBUG("goodbye!\n");
-  exit(0);
-}
-
 static void serv_uninstall_signal_handler(int signal) {
   struct sigaction sa;
   sa.sa_handler = SIG_DFL;
@@ -469,9 +456,13 @@ static void serv_handle_stop_all_request(
       serv_panic();
     }
   }
-  serv_DEBUG("all children exited\n");
+  serv_DEBUG("all children exited, goodbye!\n");
+  exit(0);
+}
 
-  serv_do_stop(sender_client);
+static void serv_handle_stop_server_only_request(void) {
+  serv_DEBUG("STOP_SERVER_ONLY_REQUEST received\n");
+  exit(0);
 }
 
 static void serv_handle_fork_request(
@@ -573,6 +564,7 @@ static void serv_handle_fork_request(
     }
     client->exit_fd = exit_pipe[1];
   }
+  serv_DEBUG("created exit pipe {%d, %d}\n", exit_pipe[0], exit_pipe[1]);
   int exit_out = exit_pipe[0];
 
   *first_client_ptr = client;
@@ -597,6 +589,12 @@ static void serv_handle_fork_request(
     },
   };
   serv_send_fds(parent->socket, res, fds_to_send, fd_count);
+  if (exit_out != -1) {
+    close(exit_out);
+  }
+  if (parent_user_socket != -1) {
+    close(parent_user_socket);
+  }
 }
 
 static void serv_handle_kill_all_request(
@@ -652,7 +650,7 @@ static void serv_handle_request(
     serv_handle_stop_all_request(*first_client_ptr, sender);
     break;
   case ClientMessageType_STOP_SERVER_ONLY_REQUEST:
-    serv_do_stop(sender);
+    serv_handle_stop_server_only_request();
     break;
   case ClientMessageType_KILL_ALL_REQUEST:
     serv_handle_kill_all_request(req, *first_client_ptr, sender);
@@ -737,6 +735,7 @@ static void serv_main(serv_Client *first_client) {
     serv_DEBUG("polling…\n");
     if (poll(poll_fds, fd_count, -1) == -1) {
       if (errno == EINTR) {
+        serv_DEBUG("poll(2) has been interrupted by a signal\n");
         // poll failed because a signal has been received.
         // Just restart it.
         // (SA_RESTART does not work with poll(2))
@@ -786,6 +785,9 @@ static void serv_main(serv_Client *first_client) {
 
       if (client->socket != -1) {
         close(client->socket);
+      }
+      if (client->exit_fd != -1) {
+        close(client->exit_fd);
       }
       free(client);
     }
@@ -963,15 +965,8 @@ libforks_Result libforks_fork(
   return libforks_OK;
 }
 
-// Reads the server response and waits until the server exits
+// waits until the server exits
 static libforks_Result finalize_stop(ServerConn *conn) {
-  ServerMessage res;
-  if (safe_read(conn->socket, &res, sizeof res) == -1) {
-    return libforks_READ_ERROR;
-  }
-
-  assert(res.type == ServerMessageType_STOP_SUCCESS);
-
   int status;
   if (waitpid(conn->server_pid, &status, 0) == -1) {
     return libforks_WAIT_ERROR;
