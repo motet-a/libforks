@@ -56,7 +56,6 @@ typedef enum {
 
 typedef struct {
   ClientMessageType type;
-  pid_t pid; // The pid of the client that sends the message
   union {
     struct {
       bool create_user_socket;
@@ -98,11 +97,11 @@ typedef struct {
 } ServerMessage;
 
 
+// The private struct pointed to by `libforks_ServerConn` pointers.
 // There is one different instance of this struct in each client process.
 typedef struct {
   int server_pid;
-  int incoming_socket_in; // Used to send data to the server. Shared.
-  int outgoing_socket_out; // Used to receive data from the server. Not shared, each process has its own.
+  int socket; // used to communicate with the server (bidirectional)
 } ServerConn;
 
 struct serv_Client;
@@ -112,18 +111,28 @@ typedef struct serv_Client serv_Client;
 // is also a client.
 struct serv_Client {
   pid_t pid;
-  serv_Client *parent; // NULL for the process that called `libforks_start()`
-  int outgoing_socket_in; // used to send messages from the server to the client
-  int exit_fd; // -1 for the main process
-  serv_Client *next; // linked list
+
+  // `true` if this client is the one that called `libforks_start`
+  bool main;
+
+  // used to communicate with the server (bidirectional)
+  // -1 if this socket has been closed
+  int socket;
+
+  // -1 if no exit file descriptor
+  int exit_fd;
+
+  // linked list
+  serv_Client *next;
 };
 
 
 
-// The writeable end of the “exit pipe”. Used by the SIGCHLD handler (inside
-// the server process) to communicate exit events to the main server loop.
+// The writeable end of the “exit pipe”. Used by the SIGCHLD signal
+// handler (inside the server process) to communicate exit events to
+// the main server loop.
 //
-// Never used in client and child processes.
+// Unused in client processes.
 static int serv_exit_pipe_in;
 
 
@@ -301,7 +310,11 @@ static void serv_send(int fd, ServerMessage msg) {
   }
 }
 
-static void serv_send_fds(int fd, ServerMessage msg, int *fds, size_t fd_count) {
+static void serv_send_fds(
+    int fd,
+    ServerMessage msg,
+    int *fds,
+    size_t fd_count) {
   int write_res = libforks_write_socket_fds(
     fd,
     &msg, sizeof msg,
@@ -324,7 +337,7 @@ static ClientMessage serv_recv(int fd) {
   return msg;
 }
 
-// Returns the removed client. Panics if the given pid is unknown.
+// Returns the removed client. Returns NULL if the pid is unknown.
 static serv_Client *serv_remove_client(serv_Client **list_ptr, pid_t pid) {
   serv_Client **prev_ptr = list_ptr;
   serv_Client *client = *list_ptr;
@@ -336,20 +349,20 @@ static serv_Client *serv_remove_client(serv_Client **list_ptr, pid_t pid) {
     prev_ptr = &((*prev_ptr)->next);
     client = client->next;
   }
-  serv_panic();
+  return NULL;
 }
 
-// Finds a client by pid. Panics if not found.
-static serv_Client *serv_find_client(serv_Client *l, pid_t pid) {
+// Returns NULL if not found
+static serv_Client *serv_find_client_by_socket(serv_Client *l, int socket) {
+  assert(socket >= 0);
   while (l) {
-    if (l->pid == pid) {
+    if (l->socket == socket) {
       return l;
     }
     l = l->next;
   }
-  serv_panic();
+  return NULL;
 }
-
 
 static void serv_sigchld_handler(int sig_) {
   (void)sig_;
@@ -376,7 +389,7 @@ static void serv_sigchld_handler(int sig_) {
 
     assert(WIFEXITED(status) || WIFSIGNALED(status));
 
-    serv_DEBUG("child %d exited, informing main loop\n", child_pid);
+    serv_DEBUG("child %d exited, informing main loop\n", (int)child_pid);
 
     libforks_ExitEvent event = {
       .pid = child_pid,
@@ -395,7 +408,7 @@ static void serv_sigchld_handler(int sig_) {
 
 static void serv_do_stop(serv_Client *sender_client) {
   serv_send(
-    sender_client->outgoing_socket_in,
+    sender_client->socket,
     (ServerMessage){
       .type = ServerMessageType_STOP_SUCCESS,
     }
@@ -403,49 +416,6 @@ static void serv_do_stop(serv_Client *sender_client) {
 
   serv_DEBUG("goodbye!\n");
   exit(0);
-}
-
-static void serv_handle_stop_all_request(
-    serv_Client **first_client_ptr,
-    serv_Client *sender_client) {
-  serv_DEBUG("STOP_ALL_REQUEST received\n");
-
-  for (serv_Client *c = *first_client_ptr; c; c = c->next) {
-    if (c->pid != sender_client->pid) {
-      serv_DEBUG("sending SIGTERM to %d\n", c->pid);
-      if (kill(c->pid, SIGTERM) == -1) {
-        if (errno != ESRCH) {
-          // ESRCH is normal if the process just exited for some
-          // other reason.
-          serv_print_errno("kill");
-          serv_panic();
-        }
-      }
-    }
-  }
-
-  if (sender_client->parent) {
-    // TODO: I wonder if we could remove this restriction if we call
-    // `wait` repeatedly
-    serv_print_error(
-      "Deadlock detected!\n"
-      "You have called a libforks function from a child process that must be called from the process "
-      "that started the fork server from a child process.\n"
-    );
-    serv_panic();
-  }
-
-  serv_DEBUG("waiting until children exit");
-  int status;
-  if (wait(&status) == -1) {
-    if (errno != ECHILD) {
-      serv_print_errno("wait");
-      serv_panic();
-    }
-  }
-  serv_DEBUG("all children exited\n");
-
-  serv_do_stop(sender_client);
 }
 
 static void serv_uninstall_signal_handler(int signal) {
@@ -459,29 +429,76 @@ static void serv_uninstall_signal_handler(int signal) {
   }
 }
 
-static void serv_handle_fork_request(
-    const ClientMessage *req,
-    serv_Client **first_client_ptr,
-    serv_Client *parent,
-    int incoming_socket_out,
-    int incoming_socket_in) {
-  serv_DEBUG("FORK_REQUEST received\n");
+static void serv_handle_stop_all_request(
+    serv_Client *first_client,
+    serv_Client *sender_client) {
+  serv_DEBUG("STOP_ALL_REQUEST received\n");
 
-  int outgoing_sockets[2];
-  if (socketpair(AF_UNIX, SOCK_STREAM, 0, outgoing_sockets) == -1) {
-    serv_print_errno("socketpair");
+  for (serv_Client *c = first_client; c; c = c->next) {
+    if (c->pid != sender_client->pid) {
+      serv_DEBUG("sending SIGTERM to %d\n", (int)c->pid);
+      if (kill(c->pid, SIGTERM) == -1) {
+        if (errno != ESRCH) {
+          // ESRCH is normal if the process just exited for some
+          // other reason.
+          serv_print_errno("kill");
+          serv_panic();
+        }
+      }
+    }
+  }
+
+  if (!sender_client->main) {
+    // unfortunately we can't use wait(2) with our parent process
+    serv_print_error(
+      "Deadlock detected!\n"
+      "Some libforks functions must be called from the process "
+      "that started the fork server.\n"
+    );
     serv_panic();
   }
 
-  int user_sockets[2] = {-1, -1};
+  // we don’t care about SIGCHLD anymore
+  serv_uninstall_signal_handler(SIGCHLD);
+
+  serv_DEBUG("waiting until children exit\n");
+  int status;
+  if (wait(&status) == -1) {
+    if (errno != ECHILD) {
+      serv_print_errno("wait");
+      serv_panic();
+    }
+  }
+  serv_DEBUG("all children exited\n");
+
+  serv_do_stop(sender_client);
+}
+
+static void serv_handle_fork_request(
+    const ClientMessage *req,
+    serv_Client **first_client_ptr, // in/out
+    serv_Client *parent) {
+  serv_DEBUG("FORK_REQUEST received\n");
+
+  pid_t server_pid = getpid();
+
+  int sockets[2]; // for private child-server communication
+  if (socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) == -1) {
+    serv_print_errno("socketpair");
+    serv_panic();
+  }
+  int server_socket = sockets[0]; // server end
+  int child_socket = sockets[1]; // child end
+
+  int user_sockets[2] = {-1, -1}; // for public parent-child communication
   if (req->u.fork_request.create_user_socket) {
     if (socketpair(AF_UNIX, SOCK_STREAM, 0, user_sockets) == -1) {
       serv_print_errno("socketpair");
       serv_panic();
     }
   }
-  int user_socket_parent = user_sockets[0]; // parent end
-  int user_socket_child = user_sockets[1]; // child end
+  int parent_user_socket = user_sockets[0]; // parent end
+  int child_user_socket = user_sockets[1]; // child end
 
   pid_t child_pid = fork();
   if (child_pid == -1) {
@@ -490,20 +507,23 @@ static void serv_handle_fork_request(
   }
 
   if (child_pid == 0) {
-    close(incoming_socket_out);
-    close(outgoing_sockets[0]);
-    if (user_socket_parent != -1) {
-      close(user_socket_parent);
+    // We are in the new child process
+
+    close(server_socket);
+    if (parent_user_socket != -1) {
+      close(parent_user_socket);
     }
 
-    // release server resources
+    // Release server resources
     serv_Client *client = *first_client_ptr;
     while (client) {
       serv_Client *next = client->next;
       if (client->exit_fd != -1) {
         close(client->exit_fd);
       }
-      close(client->outgoing_socket_in);
+      if (client->socket != -1) {
+        close(client->socket);
+      }
       free(client);
       client = next;
     }
@@ -517,19 +537,19 @@ static void serv_handle_fork_request(
       serv_print_errno("malloc");
       serv_panic();
     }
-    child_conn->incoming_socket_in = incoming_socket_in;
-    child_conn->outgoing_socket_out = outgoing_sockets[1];
+    child_conn->server_pid = server_pid;
+    child_conn->socket = child_socket;
     libforks_ServerConn conn_p = {.private = child_conn};
 
-    req->u.fork_request.entrypoint(conn_p, user_socket_child);
+    req->u.fork_request.entrypoint(conn_p, child_user_socket);
     exit(0);
   }
 
-  serv_DEBUG("created child process %d\n", child_pid);
+  serv_DEBUG("created child process %d\n", (int)child_pid);
 
-  close(outgoing_sockets[1]);
-  if (user_socket_child != -1) {
-    close(user_socket_child);
+  close(child_socket);
+  if (child_user_socket != -1) {
+    close(child_user_socket);
   }
 
   serv_Client *client = malloc(sizeof(serv_Client));
@@ -539,8 +559,8 @@ static void serv_handle_fork_request(
   }
 
   client->pid = child_pid;
-  client->parent = parent;
-  client->outgoing_socket_in = outgoing_sockets[0];
+  client->main = false;
+  client->socket = server_socket;
   client->exit_fd = -1;
   client->next = *first_client_ptr;
 
@@ -559,8 +579,8 @@ static void serv_handle_fork_request(
   int fds_to_send[2];
   size_t fd_count = 0;
 
-  if (user_socket_parent != -1) {
-    fds_to_send[fd_count++] = user_socket_parent;
+  if (parent_user_socket != -1) {
+    fds_to_send[fd_count++] = parent_user_socket;
   }
   if (exit_out != -1) {
     fds_to_send[fd_count++] = exit_out;
@@ -575,7 +595,7 @@ static void serv_handle_fork_request(
       },
     },
   };
-  serv_send_fds(parent->outgoing_socket_in, res, fds_to_send, fd_count);
+  serv_send_fds(parent->socket, res, fds_to_send, fd_count);
 }
 
 static void serv_handle_kill_all_request(
@@ -605,7 +625,7 @@ static void serv_handle_kill_all_request(
   ServerMessage res = {
     .type = ServerMessageType_KILL_SUCCESS,
   };
-  serv_send(sender->outgoing_socket_in, res);
+  serv_send(sender->socket, res);
 }
 
 static void serv_handle_eval_request(
@@ -618,14 +638,52 @@ static void serv_handle_eval_request(
   ServerMessage res = {
     .type = ServerMessageType_EVAL_SUCCESS,
   };
-  serv_send(sender->outgoing_socket_in, res);
+  serv_send(sender->socket, res);
 }
+
+static void serv_handle_request(
+    const ClientMessage *req,
+    serv_Client **first_client_ptr, // in/out
+    serv_Client *sender) {
+
+  switch (req->type) {
+  case ClientMessageType_STOP_ALL_REQUEST:
+    serv_handle_stop_all_request(*first_client_ptr, sender);
+    break;
+  case ClientMessageType_STOP_SERVER_ONLY_REQUEST:
+    serv_do_stop(sender);
+    break;
+  case ClientMessageType_KILL_ALL_REQUEST:
+    serv_handle_kill_all_request(req, *first_client_ptr, sender);
+    break;
+  case ClientMessageType_FORK_REQUEST:
+    serv_handle_fork_request(req, first_client_ptr, sender);
+    break;
+  case ClientMessageType_EVAL_REQUEST:
+    serv_handle_eval_request(req, sender);
+    break;
+  default:
+    serv_print_error("Bad message type");
+    serv_panic();
+  }
+}
+
+static unsigned serv_connected_clients(const serv_Client *c) {
+  unsigned count = 0;
+  while (c) {
+    if (c->socket != -1) {
+      count++;
+    }
+    c = c->next;
+  }
+  return count;
+};
 
 // The main loop of the fork server.
 __attribute__((noreturn))
-static void serv_main(serv_Client *first_client, int incoming_socket_out, int incoming_socket_in) {
-  serv_DEBUG("starting fork server (pid %d)\n", getpid());
-  serv_DEBUG("the main client's pid is %d\n", first_client->pid);
+static void serv_main(serv_Client *first_client) {
+  serv_DEBUG("starting fork server (pid %d)\n", (int)getpid());
+  serv_DEBUG("the main client's pid is %d\n", (int)first_client->pid);
 
   int exit_pipe[2];
   if (pipe(exit_pipe) == -1) {
@@ -658,22 +716,28 @@ static void serv_main(serv_Client *first_client, int incoming_socket_out, int in
   }
 
   while (true) {
-    // We read data from both exit_pipe_out and incoming_socket_out
-    struct pollfd poll_fds[] = {
-      {
-        .fd = exit_pipe_out,
-        .events = POLLIN,
-        .revents = 0,
-      },
-      {
-        .fd = incoming_socket_out,
-        .events = POLLIN,
-        .revents = 0,
+    size_t fd_count = 1;
+
+    struct pollfd poll_fds[1 + serv_connected_clients(first_client)];
+
+    poll_fds[0].fd = exit_pipe_out;
+    poll_fds[0].events = POLLIN | POLLPRI;
+    poll_fds[0].revents = 0;
+
+    for (serv_Client *c = first_client; c; c = c->next) {
+      if (c->socket == -1) {
+        continue;
       }
-    };
+
+      struct pollfd *pollfd = poll_fds + fd_count;
+      pollfd->fd = c->socket;
+      pollfd->events = POLLIN | POLLPRI,
+      pollfd->revents = 0,
+      fd_count++;
+    }
 
     serv_DEBUG("polling…\n");
-    if (poll(poll_fds, sizeof(poll_fds) / sizeof(struct pollfd), -1) == -1) {
+    if (poll(poll_fds, fd_count, -1) == -1) {
       if (errno == EINTR) {
         // poll failed because a signal has been received.
         // Just restart it.
@@ -686,55 +750,93 @@ static void serv_main(serv_Client *first_client, int incoming_socket_out, int in
     }
 
     if (poll_fds[0].revents) {
+      assert(
+        (poll_fds[0].revents & POLLIN) ||
+        (poll_fds[0].revents & POLLPRI)
+      );
+
       libforks_ExitEvent event;
       if (safe_read(exit_pipe_out, &event, sizeof event) == -1) {
         serv_print_errno("read");
         serv_panic();
       }
 
-      serv_DEBUG("main loop knows that %d has exited\n", event.pid);
+      serv_DEBUG("main loop knows that %d has exited\n", (int)event.pid);
 
-      serv_Client *child_client = serv_remove_client(&first_client, event.pid);
-      if (child_client->exit_fd != -1) {
-        serv_DEBUG("informing parent that %d has exited\n", event.pid);
+      serv_Client *client = serv_remove_client(&first_client, event.pid);
+      if (!client) {
+        serv_DEBUG("child exit already handled\n");
+        // already handled because the socket has been closed and the
+        // SIGCHLD signal arrived a bit late
+        continue;
+      }
+
+      if (client->exit_fd != -1) {
+        serv_DEBUG("informing parent that %d has exited\n", (int)event.pid);
         // there’s no error if the read end of the pipe is closed
         // by the parent (at least on macOS)
-        if (safe_write(child_client->exit_fd, &event, sizeof event) == -1) {
-          serv_print_errno("write");
+        if (safe_write(client->exit_fd, &event, sizeof event) == -1) {
+          serv_print_errno("exit pipe write");
           serv_panic();
         }
       }
 
-      close(child_client->outgoing_socket_in);
-      free(child_client);
+      if (serv_connected_clients(first_client) == 0) {
+        serv_DEBUG("no more connected clients, goodbye!\n");
+        exit(0);
+      }
+
+      if (client->socket != -1) {
+        close(client->socket);
+      }
+      free(client);
     }
 
-    if (poll_fds[1].revents) {
-      ClientMessage req = serv_recv(incoming_socket_out);
+    for (size_t i = 1; i < fd_count; i++) {
+      struct pollfd *pollfd = poll_fds + i;
+      if (!pollfd->revents) {
+        continue;
+      }
 
-      serv_Client *sender = serv_find_client(first_client, req.pid);
-      assert(sender);
+      serv_Client *sender = serv_find_client_by_socket(
+        first_client,
+        pollfd->fd
+      );
+      if (!sender) {
+        // the client has just exited and has been removed by the
+        // libforks_ExitEvent handler
+        continue;
+      }
 
-      if (req.type == ClientMessageType_STOP_ALL_REQUEST) {
-        serv_handle_stop_all_request(&first_client, sender);
-      } else if (req.type == ClientMessageType_STOP_SERVER_ONLY_REQUEST) {
-        serv_do_stop(sender);
-      } else if (req.type == ClientMessageType_KILL_ALL_REQUEST) {
-        serv_handle_kill_all_request(&req, first_client, sender);
-      } else if (req.type == ClientMessageType_FORK_REQUEST) {
-        serv_handle_fork_request(
-          &req,
-          &first_client,
-          sender,
-          incoming_socket_out,
-          incoming_socket_in
-        );
-      } else if (req.type == ClientMessageType_EVAL_REQUEST) {
-        serv_handle_eval_request(&req, sender);
-      } else {
-        serv_print_error("Bad message type");
+      if ((pollfd->revents & POLLERR) || (pollfd->revents & POLLNVAL)) {
+        serv_print_error("socket read error (with client %d)",
+            (int)sender->pid);
         serv_panic();
       }
+
+      if (pollfd->revents & POLLHUP) {
+        serv_DEBUG("client %d closed its socket\n", (int)sender->pid);
+        // The sender may or may not have exited. We can’t forget it right
+        // now because we may need its `exit_fd` to notify its parent
+        // when it will actually exits.
+        assert(sender->socket != -1);
+        close(sender->socket);
+        sender->socket = -1;
+        if (serv_connected_clients(first_client) == 0) {
+          serv_DEBUG("no more connected clients, goodbye!\n");
+          exit(0);
+        }
+        continue;
+      }
+
+      assert(
+        (pollfd->revents & POLLIN) ||
+        (pollfd->revents & POLLPRI)
+      );
+
+      assert(sender->socket == pollfd->fd);
+      ClientMessage req = serv_recv(pollfd->fd);
+      serv_handle_request(&req, &first_client, sender);
     }
   }
 }
@@ -743,16 +845,10 @@ libforks_Result libforks_start(libforks_ServerConn *conn_ptr) {
   libforks_Result res;
   pid_t main_proc_pid = getpid();
 
-  int incoming_sockets[2];
-  if (socketpair(AF_UNIX, SOCK_STREAM, 0, incoming_sockets) == -1) {
+  int sockets[2];
+  if (socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) == -1) {
     res = libforks_SOCKET_CREATION_ERROR;
     goto exit;
-  }
-
-  int outgoing_sockets[2];
-  if (socketpair(AF_UNIX, SOCK_STREAM, 0, outgoing_sockets) == -1) {
-    res = libforks_SOCKET_CREATION_ERROR;
-    goto del_incoming_sockets;
   }
 
   int server_pid = fork();
@@ -763,7 +859,7 @@ libforks_Result libforks_start(libforks_ServerConn *conn_ptr) {
 
   if (server_pid == 0) {
     // this is the server process
-    close(outgoing_sockets[1]);
+    close(sockets[1]);
 
     serv_Client *client = malloc(sizeof(serv_Client));
     if (!client) {
@@ -771,12 +867,12 @@ libforks_Result libforks_start(libforks_ServerConn *conn_ptr) {
       serv_panic();
     }
     client->pid = main_proc_pid;
-    client->parent = NULL;
-    client->outgoing_socket_in = outgoing_sockets[0];
+    client->main = true;
+    client->socket = sockets[0];
     client->exit_fd = -1;
     client->next = NULL;
 
-    serv_main(client, incoming_sockets[1], incoming_sockets[0]);
+    serv_main(client);
     abort(); // not reached
   }
 
@@ -786,11 +882,9 @@ libforks_Result libforks_start(libforks_ServerConn *conn_ptr) {
     goto kill_server;
   }
 
-  close(incoming_sockets[1]);
-  close(outgoing_sockets[0]);
+  close(sockets[0]);
   conn->server_pid = server_pid;
-  conn->incoming_socket_in = incoming_sockets[0];
-  conn->outgoing_socket_out = outgoing_sockets[1];
+  conn->socket = sockets[1];
 
   conn_ptr->private = conn;
   res = libforks_OK;
@@ -800,12 +894,8 @@ kill_server:
   kill(server_pid, SIGKILL);
 
 del_sockets:
-  close(outgoing_sockets[0]);
-  close(outgoing_sockets[1]);
-
-del_incoming_sockets:
-  close(incoming_sockets[0]);
-  close(incoming_sockets[1]);
+  close(sockets[0]);
+  close(sockets[1]);
 
 exit:
   return res;
@@ -829,7 +919,6 @@ libforks_Result libforks_fork(
 
   ClientMessage req = {
     .type = ClientMessageType_FORK_REQUEST,
-    .pid = getpid(),
     .u = {
       .fork_request = {
         .create_user_socket = socket_fd_ptr != NULL,
@@ -839,14 +928,14 @@ libforks_Result libforks_fork(
     },
   };
 
-  if (safe_write(conn->incoming_socket_in, &req, sizeof req) == -1) {
+  if (safe_write(conn->socket, &req, sizeof req) == -1) {
     return libforks_WRITE_ERROR;
   }
 
   ServerMessage res;
   int received_fds[2] = {-1, -1};
   int read_res = libforks_read_socket_fds(
-    conn->outgoing_socket_out,
+    conn->socket,
     &res, sizeof res,
     received_fds, 2
   );
@@ -879,7 +968,7 @@ libforks_Result libforks_fork(
 // Reads the server response and waits until the server exits
 static libforks_Result finalize_stop(ServerConn *conn) {
   ServerMessage res;
-  if (safe_read(conn->outgoing_socket_out, &res, sizeof res) == -1) {
+  if (safe_read(conn->socket, &res, sizeof res) == -1) {
     return libforks_READ_ERROR;
   }
 
@@ -892,8 +981,7 @@ static libforks_Result finalize_stop(ServerConn *conn) {
 
   assert(WIFEXITED(status) || WIFSIGNALED(status));
 
-  close(conn->incoming_socket_in);
-  close(conn->outgoing_socket_out);
+  close(conn->socket);
   free(conn);
   return libforks_OK;
 }
@@ -903,10 +991,9 @@ libforks_Result libforks_stop_server_only(libforks_ServerConn conn_p) {
 
   ClientMessage req = {
     .type = ClientMessageType_STOP_SERVER_ONLY_REQUEST,
-    .pid = getpid(),
   };
 
-  if (safe_write(conn->incoming_socket_in, &req, sizeof req) == -1) {
+  if (safe_write(conn->socket, &req, sizeof req) == -1) {
     return libforks_WRITE_ERROR;
   }
 
@@ -918,9 +1005,8 @@ libforks_Result libforks_stop(libforks_ServerConn conn_p) {
 
   ClientMessage req = {
     .type = ClientMessageType_STOP_ALL_REQUEST,
-    .pid = getpid(),
   };
-  if (safe_write(conn->incoming_socket_in, &req, sizeof req) == -1) {
+  if (safe_write(conn->socket, &req, sizeof req) == -1) {
     return libforks_WRITE_ERROR;
   }
 
@@ -929,8 +1015,7 @@ libforks_Result libforks_stop(libforks_ServerConn conn_p) {
 
 libforks_Result libforks_free_conn(libforks_ServerConn conn_p) {
   ServerConn *conn = conn_p.private;
-  if (close(conn->incoming_socket_in) ||
-      close(conn->outgoing_socket_out)) {
+  if (close(conn->socket)) {
     return libforks_CLOSE_ERROR;
   }
   free(conn);
@@ -942,19 +1027,18 @@ libforks_Result libforks_kill_all(libforks_ServerConn conn_p, int signal) {
 
   ClientMessage req = {
     .type = ClientMessageType_KILL_ALL_REQUEST,
-    .pid = getpid(),
     .u = {
       .kill_all_request = {
         .signal = signal
       },
     },
   };
-  if (safe_write(conn->incoming_socket_in, &req, sizeof req) == -1) {
+  if (safe_write(conn->socket, &req, sizeof req) == -1) {
     return libforks_WRITE_ERROR;
   }
 
   ServerMessage res;
-  if (safe_read(conn->outgoing_socket_out, &res, sizeof res) == -1) {
+  if (safe_read(conn->socket, &res, sizeof res) == -1) {
     return libforks_READ_ERROR;
   }
 
@@ -967,24 +1051,22 @@ libforks_Result libforks_eval(libforks_ServerConn conn_p, void (*function)(void)
 
   ClientMessage req = {
     .type = ClientMessageType_EVAL_REQUEST,
-    .pid = getpid(),
     .u = {
       .eval_request = {
         .function = function
       },
     },
   };
-  if (safe_write(conn->incoming_socket_in, &req, sizeof req) == -1) {
+  if (safe_write(conn->socket, &req, sizeof req) == -1) {
     return libforks_WRITE_ERROR;
   }
 
   ServerMessage res;
-  if (safe_read(conn->outgoing_socket_out, &res, sizeof res) == -1) {
+  if (safe_read(conn->socket, &res, sizeof res) == -1) {
     return libforks_READ_ERROR;
   }
 
   assert(res.type == ServerMessageType_EVAL_SUCCESS);
   return libforks_OK;
 }
-
 
