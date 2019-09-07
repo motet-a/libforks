@@ -133,7 +133,7 @@ struct serv_Client {
 // the main server loop.
 //
 // Unused in client processes.
-static int serv_exit_pipe_in;
+static int serv_exit_pipe[2];
 
 
 #ifndef NDEBUG
@@ -395,7 +395,7 @@ static void serv_sigchld_handler(int sig_) {
       .pid = child_pid,
       .wait_status = status,
     };
-    if (safe_write(serv_exit_pipe_in, &event, sizeof event) == -1) {
+    if (safe_write(serv_exit_pipe[1], &event, sizeof event) == -1) {
       serv_print_errno("write(2) system call in SIGCHLD handler");
       serv_panic();
     }
@@ -527,7 +527,8 @@ static void serv_handle_fork_request(
       free(client);
       client = next;
     }
-    close(serv_exit_pipe_in);
+    close(serv_exit_pipe[0]);
+    close(serv_exit_pipe[1]);
 
     serv_uninstall_signal_handler(SIGTERM);
     serv_uninstall_signal_handler(SIGCHLD);
@@ -685,13 +686,10 @@ static void serv_main(serv_Client *first_client) {
   serv_DEBUG("starting fork server (pid %d)\n", (int)getpid());
   serv_DEBUG("the main client's pid is %d\n", (int)first_client->pid);
 
-  int exit_pipe[2];
-  if (pipe(exit_pipe) == -1) {
+  if (pipe(serv_exit_pipe) == -1) {
     serv_print_errno("pipe");
     serv_panic();
   }
-  int exit_pipe_out = exit_pipe[0];
-  serv_exit_pipe_in = exit_pipe[1];
 
   // Ignore SIGTERM.
   // Some container environments send SIGTERM to all processes
@@ -706,7 +704,7 @@ static void serv_main(serv_Client *first_client) {
       serv_panic();
   }
 
-  // Stay notified of child exits through a SIGCHLD handler and `exit_pipe`
+  // Stay notified of child exits through a SIGCHLD handler and `serv_exit_pipe`
   sa.sa_handler = serv_sigchld_handler;
   sa.sa_flags = SA_RESTART | SA_NOCLDSTOP;
   sigemptyset(&sa.sa_mask);
@@ -720,7 +718,7 @@ static void serv_main(serv_Client *first_client) {
 
     struct pollfd poll_fds[1 + serv_connected_clients(first_client)];
 
-    poll_fds[0].fd = exit_pipe_out;
+    poll_fds[0].fd = serv_exit_pipe[0];
     poll_fds[0].events = POLLIN | POLLPRI;
     poll_fds[0].revents = 0;
 
@@ -756,7 +754,7 @@ static void serv_main(serv_Client *first_client) {
       );
 
       libforks_ExitEvent event;
-      if (safe_read(exit_pipe_out, &event, sizeof event) == -1) {
+      if (safe_read(serv_exit_pipe[0], &event, sizeof event) == -1) {
         serv_print_errno("read");
         serv_panic();
       }
