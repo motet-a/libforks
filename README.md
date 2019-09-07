@@ -212,10 +212,11 @@ This function should be used in child processes before
 calling `execve` in order to close some internal file
 descriptors.
 
-This function does not send any message to the fork server.
-The fork server will not forget this process and exit file
-descriptors will continue to work (i.e. the parent will be
-notified when this process will exit).
+This function does not send any message to the fork server
+but the server will notice that the connection has been
+closed. Exit file descriptors will continue to work
+(i.e. the parent will be notified when this process will
+exit in anyway).
 
 -----
 
