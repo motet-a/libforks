@@ -51,8 +51,8 @@
 // cc -Ilibforks/ myprogram.c libforks/libforks.c
 // ```
 
-#ifndef LIBFORK_H_          // no doc
-#define LIBFORK_H_          // no doc
+#ifndef LIBFORKS_H_          // no doc
+#define LIBFORKS_H_          // no doc
 
 #ifdef __cplusplus          // no doc
 extern "C" {                // no doc
@@ -275,7 +275,7 @@ int libforks_write_socket_fds(
 }                     // no doc
 #endif                // no doc
 
-#endif // LIBFORK_H_  // no doc
+#endif // LIBFORKS_H_  // no doc
 
 // -----
 

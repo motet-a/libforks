@@ -38,7 +38,7 @@
 // Symbols that are specific to the server have a name prefixed by serv_.
 
 
-#ifdef LIBFORK_DEBUG
+#ifdef LIBFORKS_DEBUG
 #  define serv_DEBUG(...) (fprintf(stderr, "libforks server: " __VA_ARGS__))
 #else
 #  define serv_DEBUG(...)
