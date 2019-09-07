@@ -424,8 +424,8 @@ static void serv_uninstall_signal_handler(int signal) {
   sa.sa_flags = 0;
   sigemptyset(&sa.sa_mask);
   if (sigaction(signal, &sa, 0) == -1) {
-      serv_print_errno(NULL);
-      serv_panic();
+    serv_print_errno(NULL);
+    serv_panic();
   }
 }
 
