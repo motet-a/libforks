@@ -421,6 +421,19 @@ static void serv_handle_stop_all_request(
     serv_Client *sender_client) {
   serv_DEBUG("STOP_ALL_REQUEST received\n");
 
+  if (!sender_client->main) {
+    // unfortunately we can't use wait(2) with our parent process
+    serv_print_error(
+      "Deadlock detected!\n"
+      "Some libforks functions must be called from the process "
+      "that started the fork server.\n"
+    );
+    serv_panic();
+  }
+
+  // we don’t care about SIGCHLD anymore
+  serv_uninstall_signal_handler(SIGCHLD);
+
   for (serv_Client *c = first_client; c; c = c->next) {
     if (c->pid != sender_client->pid) {
       serv_DEBUG("sending SIGTERM to %d\n", (int)c->pid);
@@ -434,19 +447,6 @@ static void serv_handle_stop_all_request(
       }
     }
   }
-
-  if (!sender_client->main) {
-    // unfortunately we can't use wait(2) with our parent process
-    serv_print_error(
-      "Deadlock detected!\n"
-      "Some libforks functions must be called from the process "
-      "that started the fork server.\n"
-    );
-    serv_panic();
-  }
-
-  // we don’t care about SIGCHLD anymore
-  serv_uninstall_signal_handler(SIGCHLD);
 
   serv_DEBUG("waiting until children exit\n");
   int status;
