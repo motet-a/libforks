@@ -128,9 +128,9 @@ struct serv_Client {
 
 
 
-// The writeable end of the “exit pipe”. Used by the SIGCHLD signal
-// handler (inside the server process) to communicate exit events to
-// the main server loop.
+// Pipe used inside the server process by the SIGCHLD signal
+// handler to communicate exit events to the main server loop
+// (because that’s async-signal safe).
 //
 // Unused in client processes.
 static int serv_exit_pipe[2];
