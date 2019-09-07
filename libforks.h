@@ -81,17 +81,15 @@ typedef enum {
   libforks_OK = 0, // No error
   libforks_READ_ERROR = -1,
   libforks_WRITE_ERROR = -2,
-  libforks_KILL_ERROR = -3,
-  libforks_SOCKET_CREATION_ERROR = -4,
-  libforks_MALLOC_ERROR = -5,
-  libforks_FORK_ERROR = -6,
-  libforks_WAIT_ERROR = -7,
-  libforks_STOP_ERROR = -8,
-  libforks_PIPE_CREATION_ERROR = -9,
-  libforks_CLOSE_ERROR = -10,
+  libforks_SOCKET_CREATION_ERROR = -3,
+  libforks_MALLOC_ERROR = -4,
+  libforks_FORK_ERROR = -5,
+  libforks_WAIT_ERROR = -6,
+  libforks_CLOSE_ERROR = -7,
 } libforks_Result;
-// Error codes used by this library. More codes may be added in
-// the future. `libforks_OK` means “no error”.
+// Error codes used by this library. In the future, more errors
+// can be added and values of existing errors may change.
+// `libforks_OK` means “no error”.
 
 // -----
 
