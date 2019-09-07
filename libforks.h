@@ -90,7 +90,7 @@ typedef enum {
   libforks_PIPE_CREATION_ERROR = -9,
   libforks_CLOSE_ERROR = -10,
 } libforks_Result;
-// Errors codes used by this library. More codes may be added in
+// Error codes used by this library. More codes may be added in
 // the future. `libforks_OK` means “no error”.
 
 // -----
