@@ -526,6 +526,8 @@ static void serv_handle_fork_request(
 
     ServerConn *child_conn = malloc(sizeof(ServerConn));
     if (!child_conn) {
+      // XXX using `serv_*` functions here is not very correct
+      // because we are in the child
       serv_print_errno("malloc");
       serv_panic();
     }
@@ -684,6 +686,11 @@ static void serv_main(serv_Client *first_client) {
   serv_DEBUG("starting fork server (pid %d)\n", (int)getpid());
   serv_DEBUG("the main client's pid is %d\n", (int)first_client->pid);
 
+  if (signal(SIGPIPE, SIG_IGN)) {
+    serv_print_errno(NULL);
+    serv_panic();
+  }
+
   if (pipe(serv_exit_pipe) == -1) {
     serv_print_errno("pipe");
     serv_panic();
@@ -770,11 +777,16 @@ static void serv_main(serv_Client *first_client) {
 
       if (client->exit_fd != -1) {
         serv_DEBUG("informing parent that %d has exited\n", (int)event.pid);
-        // there’s no error if the read end of the pipe is closed
-        // by the parent (at least on macOS)
         if (safe_write(client->exit_fd, &event, sizeof event) == -1) {
-          serv_print_errno("exit pipe write");
-          serv_panic();
+          if (errno == EPIPE) {
+            // Ignore the error because that’s pretty much normal and
+            // expected, it happens if the client has closed the pipe
+            // or exited.
+            // (SIGPIPE is already ignored)
+          } else {
+            serv_print_errno("exit pipe write");
+            serv_panic();
+          }
         }
       }
 
