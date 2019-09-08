@@ -45,8 +45,16 @@ int main() {
 
   check(libforks_stop(conn) == libforks_OK); // SIGTERM sent but ignored by the child
 
-  check(read(pipe_fds[0], &c, 1) == 1);
-  check(c == 'a');
+  while (true) {
+    int r = read(pipe_fds[0], &c, 1);
+    if (r == -1) {
+      check(errno == EAGAIN);
+    } else {
+      check(r == 1);
+      break;
+    }
+  }
+
   return 0;
 }
 
