@@ -145,6 +145,8 @@ struct serv_Client {
 static int serv_exit_pipe[2];
 
 
+// It is mostly safe to ignore errors returned by `close`
+// https://lwn.net/Articles/576478/
 #ifndef NDEBUG
 static int checked_close(int fd) {
   if (close(fd) != 0) {
@@ -1047,7 +1049,7 @@ static libforks_Result finalize_stop(ServerConn *conn) {
 
   assert(WIFEXITED(status) || WIFSIGNALED(status));
 
-  close(conn->socket);
+  close(conn->socket); // ignore error
   free(conn);
   return libforks_OK;
 }
@@ -1081,9 +1083,7 @@ libforks_Result libforks_stop(libforks_ServerConn conn_p) {
 
 libforks_Result libforks_free_conn(libforks_ServerConn conn_p) {
   ServerConn *conn = conn_p.private;
-  if (close(conn->socket)) {
-    return libforks_CLOSE_ERROR;
-  }
+  close(conn->socket); // ignore error
   free(conn);
   return libforks_OK;
 }
