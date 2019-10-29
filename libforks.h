@@ -85,8 +85,7 @@ typedef enum {
   libforks_MALLOC_ERROR = -4,
   libforks_FORK_ERROR = -5,
   libforks_WAIT_ERROR = -6,
-  libforks_CLOSE_ERROR = -7,
-  libforks_TOO_MANY_CLIENTS_ERROR = -8,
+  libforks_TOO_MANY_CLIENTS_ERROR = -7,
 } libforks_Result;
 // Error codes used by this library. In the future, more errors
 // can be added and values of existing errors may change.
@@ -117,6 +116,11 @@ libforks_Result libforks_start(libforks_ServerConn *conn_ptr);
 // can be shared by many different processes, a process can call
 // this function many times in order to start many different
 // fork servers.
+//
+// Errors:
+// - `libforks_SOCKET_CREATION_ERROR`: socketpair(2) failed
+// - `libforks_FORK_ERROR`: fork(2) failed
+// - `libforks_MALLOC_ERROR`: malloc(3) failed
 
 // -----
 
@@ -174,6 +178,13 @@ libforks_Result libforks_fork(
 //
 // This function is thread-safe, it is safe to use it concurrently
 // with the same `libfork_ServerConn` shared between multiple threads.
+//
+// Errors:
+// - `libforks_WRITE_ERROR`: `write(2)` failed to send a message to the server
+// - `libforks_READ_ERROR`: `read(2)` failed to receive a message from the server
+// - `libforks_READ_ERROR`: `read(2)` failed to receive a message from the server
+// - `libforks_TOO_MANY_CLIENTS_ERROR`: the maximum number of processes connected
+//    to the server has been reached
 
 // -----
 
@@ -188,6 +199,10 @@ libforks_Result libforks_stop(libforks_ServerConn conn);
 // This function invalidates the given ServerConn. It must be called
 // from the process that started the fork server, otherwise it
 // will deadlock.
+//
+// Errors:
+// - `libforks_WRITE_ERROR`: `write(2)` failed to send a message to the server
+// - `libforks_READ_ERROR`: `read(2)` failed to receive a message from the server
 
 
 // -----
@@ -206,11 +221,17 @@ libforks_Result libforks_free_conn(libforks_ServerConn conn);
 // closed. Exit file descriptors will continue to work
 // (i.e. the parent will be notified when this process will
 // exit in anyway).
+//
+// This function never fails.
 
 // -----
 
 libforks_Result libforks_kill_all(libforks_ServerConn conn, int signal);
 // Sends the given signal to any running children (except the caller).
+//
+// Errors:
+// - `libforks_WRITE_ERROR`: `write(2)` failed to send a message to the server
+// - `libforks_READ_ERROR`: `read(2)` failed to receive a message from the server
 
 // -----
 
@@ -221,6 +242,11 @@ libforks_Result libforks_stop_server_only(libforks_ServerConn conn);
 //
 // This function invalidates the given ServerConn. It must be called
 // from the process that started the fork server.
+//
+// Errors:
+// - `libforks_WRITE_ERROR`: `write(2)` failed to send a message to the server
+// - `libforks_READ_ERROR`: `read(2)` failed to receive a message from the server
+
 
 // -----
 
