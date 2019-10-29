@@ -44,6 +44,12 @@
 #  define serv_DEBUG(...)
 #endif
 
+#ifndef serv_MAX_CLIENTS
+#  define serv_MAX_CLIENTS 1023
+#endif
+
+#define CMSG_BUFFER_SIZE (sizeof(int) * 32)
+
 
 // There’s a protocol between the fork server and its clients
 typedef enum {
@@ -115,7 +121,11 @@ struct serv_Client {
   bool main;
 
   // used to communicate with the server (bidirectional)
-  // -1 if this socket has been closed
+  //
+  // -1 means that the client is a “zombie”, i.e. its socket is
+  // closed and it is permanently disconnected from the server
+  // but the parent of this client has not been notified yet so
+  // we have to keep it in the linked list for a while.
   int socket;
 
   // -1 if no exit file descriptor
@@ -189,15 +199,21 @@ int libforks_read_socket_fds(
     .iov_len = length,
   };
 
-  char cmsg_buffer[CMSG_SPACE(sizeof(int) * max_fd_count)];
-  memset(cmsg_buffer, 0, sizeof cmsg_buffer);
+  char cmsg_buffer[CMSG_BUFFER_SIZE];
+  size_t cmsg_buffer_space = CMSG_SPACE(sizeof(int) * max_fd_count);
+
+  if (cmsg_buffer_space > sizeof cmsg_buffer) {
+    return ENOMEM;
+  }
+
+  memset(cmsg_buffer, 0, cmsg_buffer_space);
 
   struct msghdr msg;
   memset(&msg, 0, sizeof(msg));
   msg.msg_iov = &iovec;
   msg.msg_iovlen = 1;
   msg.msg_control = cmsg_buffer;
-  msg.msg_controllen = sizeof(cmsg_buffer);
+  msg.msg_controllen = cmsg_buffer_space;
 
   ssize_t recv_res = recvmsg(socket_fd, &msg, 0);
   if (recv_res == -1) {
@@ -248,15 +264,21 @@ int libforks_write_socket_fds(
     .iov_len = length,
   };
 
-  char cmsg_buffer[CMSG_SPACE(sizeof(int) * fd_count)];
-  memset(cmsg_buffer, 0, sizeof cmsg_buffer);
+  char cmsg_buffer[CMSG_BUFFER_SIZE];
+  size_t cmsg_buffer_space = CMSG_SPACE(sizeof(int) * fd_count);
+
+  if (cmsg_buffer_space > sizeof cmsg_buffer) {
+    return ENOMEM;
+  }
+
+  memset(cmsg_buffer, 0, cmsg_buffer_space);
 
   struct msghdr msg;
   memset(&msg, 0, sizeof(msg));
   msg.msg_iov = &iovec;
   msg.msg_iovlen = 1;
   msg.msg_control = cmsg_buffer;
-  msg.msg_controllen = sizeof(cmsg_buffer);
+  msg.msg_controllen = cmsg_buffer_space;
 
   struct cmsghdr *cmsg = CMSG_FIRSTHDR(&msg);
   assert(cmsg);
@@ -434,6 +456,10 @@ static void serv_handle_stop_all_request(
   // we don’t care about SIGCHLD anymore
   serv_uninstall_signal_handler(SIGCHLD);
 
+  // We could send all the signals first and then wait
+  // for termination. It’s a bit more complex but it
+  // could be significantly faster.
+
   for (serv_Client *c = first_client; c; c = c->next) {
     if (c->pid != sender_client->pid) {
       serv_DEBUG("sending SIGTERM to %d\n", (int)c->pid);
@@ -444,18 +470,17 @@ static void serv_handle_stop_all_request(
           serv_print_errno("kill");
           serv_panic();
         }
+      } else {
+        serv_DEBUG("waiting for %d\n", (int)c->pid);
+        int status;
+        if (waitpid(c->pid, &status, 0) == -1) {
+          serv_print_errno("waitpid");
+          serv_panic();
+        }
       }
     }
   }
 
-  serv_DEBUG("waiting until children exit\n");
-  int status;
-  if (wait(&status) == -1) {
-    if (errno != ECHILD) {
-      serv_print_errno("wait");
-      serv_panic();
-    }
-  }
   serv_DEBUG("all children exited, goodbye!\n");
   exit(0);
 }
@@ -468,8 +493,22 @@ static void serv_handle_stop_server_only_request(void) {
 static void serv_handle_fork_request(
     const ClientMessage *req,
     serv_Client **first_client_ptr, // in/out
+    size_t *client_count_ptr, // in/out
     serv_Client *parent) {
   serv_DEBUG("FORK_REQUEST received\n");
+
+  if (*client_count_ptr == serv_MAX_CLIENTS) {
+    ServerMessage res = {
+      .type = ServerMessageType_FORK_FAILURE,
+      .u = {
+        .fork_failure = {
+          .error_code = libforks_TOO_MANY_CLIENTS_ERROR,
+        },
+      },
+    };
+    serv_send(parent->socket, res);
+    return;
+  }
 
   pid_t server_pid = getpid();
 
@@ -535,6 +574,13 @@ static void serv_handle_fork_request(
     child_conn->socket = child_socket;
     libforks_ServerConn conn_p = {.private = child_conn};
 
+    // Inform the parent that we are ready.
+    if (safe_write(child_socket, "r", 1) == -1) {
+      // XXX not very correct as well
+      serv_print_errno("safe_write");
+      serv_panic();
+    }
+
     req->u.fork_request.entrypoint(conn_p, child_user_socket);
     exit(0);
   }
@@ -570,6 +616,7 @@ static void serv_handle_fork_request(
   int exit_out = exit_pipe[0];
 
   *first_client_ptr = client;
+  (*client_count_ptr)++;
 
   int fds_to_send[2];
   size_t fd_count = 0;
@@ -579,6 +626,16 @@ static void serv_handle_fork_request(
   }
   if (exit_out != -1) {
     fds_to_send[fd_count++] = exit_out;
+  }
+
+  // Wait until the child is ready. This is necessary because if
+  // libforks_stop() is called just after libforks_fork(), the child
+  // process may not have uninstalled its SIGTERM handler yet and
+  // may ignore the signal sent by libforks_stop().
+  char ready_char;
+  if (safe_read(server_socket, &ready_char, 1) == -1 || ready_char != 'r') {
+    serv_print_errno("safe_read");
+    serv_panic();
   }
 
   serv_DEBUG("sending %d file descriptor(s)\n", (int)fd_count);
@@ -645,6 +702,7 @@ static void serv_handle_eval_request(
 static void serv_handle_request(
     const ClientMessage *req,
     serv_Client **first_client_ptr, // in/out
+    size_t *client_count_ptr, // in/out
     serv_Client *sender) {
 
   switch (req->type) {
@@ -658,7 +716,7 @@ static void serv_handle_request(
     serv_handle_kill_all_request(req, *first_client_ptr, sender);
     break;
   case ClientMessageType_FORK_REQUEST:
-    serv_handle_fork_request(req, first_client_ptr, sender);
+    serv_handle_fork_request(req, first_client_ptr, client_count_ptr, sender);
     break;
   case ClientMessageType_EVAL_REQUEST:
     serv_handle_eval_request(req, sender);
@@ -669,6 +727,7 @@ static void serv_handle_request(
   }
 }
 
+// Returns how many clients are still connected (i.e. not a zombie)
 static unsigned serv_connected_clients(const serv_Client *c) {
   unsigned count = 0;
   while (c) {
@@ -718,10 +777,12 @@ static void serv_main(serv_Client *first_client) {
     serv_panic();
   }
 
+  size_t client_count = 1;
+
   while (true) {
     size_t fd_count = 1;
 
-    struct pollfd poll_fds[1 + serv_connected_clients(first_client)];
+    struct pollfd poll_fds[1 + serv_MAX_CLIENTS];
 
     poll_fds[0].fd = serv_exit_pipe[0];
     poll_fds[0].events = POLLIN | POLLPRI;
@@ -729,9 +790,10 @@ static void serv_main(serv_Client *first_client) {
 
     for (serv_Client *c = first_client; c; c = c->next) {
       if (c->socket == -1) {
-        continue;
+        continue; // “zombie” disconnected client
       }
 
+      assert(fd_count <= (sizeof(poll_fds) / sizeof(struct pollfd)));
       struct pollfd *pollfd = poll_fds + fd_count;
       pollfd->fd = c->socket;
       pollfd->events = POLLIN | POLLPRI,
@@ -754,6 +816,8 @@ static void serv_main(serv_Client *first_client) {
     }
 
     if (poll_fds[0].revents) {
+      // A SIGCHLD signal has been received.
+
       assert(
         (poll_fds[0].revents & POLLIN) ||
         (poll_fds[0].revents & POLLPRI)
@@ -768,12 +832,8 @@ static void serv_main(serv_Client *first_client) {
       serv_DEBUG("main loop knows that %d has exited\n", (int)event.pid);
 
       serv_Client *client = serv_remove_client(&first_client, event.pid);
-      if (!client) {
-        serv_DEBUG("child exit already handled\n");
-        // already handled because the socket has been closed and the
-        // SIGCHLD signal arrived a bit late
-        continue;
-      }
+      assert(client);
+      client_count--;
 
       if (client->exit_fd != -1) {
         serv_DEBUG("informing parent that %d has exited\n", (int)event.pid);
@@ -830,7 +890,8 @@ static void serv_main(serv_Client *first_client) {
         serv_DEBUG("client %d closed its socket\n", (int)sender->pid);
         // The sender may or may not have exited. We can’t forget it right
         // now because we may need its `exit_fd` to notify its parent
-        // when it will actually exits.
+        // when it will actually exits, so we mark it as a “zombie” by
+        // setting its `socket` to -1 and wait for a SIGCHLD signal.
         assert(sender->socket != -1);
         close(sender->socket);
         sender->socket = -1;
@@ -848,7 +909,7 @@ static void serv_main(serv_Client *first_client) {
 
       assert(sender->socket == pollfd->fd);
       ClientMessage req = serv_recv(pollfd->fd);
-      serv_handle_request(&req, &first_client, sender);
+      serv_handle_request(&req, &first_client, &client_count, sender);
     }
   }
 }

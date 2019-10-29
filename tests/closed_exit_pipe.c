@@ -34,9 +34,10 @@ int main() {
   write(socket_fd, "o", 1);
   check(write(socket_fd, "o", 1) == 1);
 
-  // child exits now, but exit_fd is closed
-
+  // child exits now, but since exit_fd is closed we have to do this
+  // dirty hack
   check(libforks_eval(conn, serv_wait) == libforks_OK);
+
   check(libforks_stop(conn) == libforks_OK);
 
   return 0;

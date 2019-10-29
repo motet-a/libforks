@@ -2,7 +2,10 @@
 
 #include <sys/resource.h>
 
-#define LOOPS 9
+// This test creates and destroys child processes repeatedly
+// and makes sure that we don’t leak any file descriptor.
+
+#define LOOPS 19
 
 static void child_main(libforks_ServerConn conn, int socket_fd) {
   (void)socket_fd;

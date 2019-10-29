@@ -39,6 +39,8 @@ int main() {
     child_main
   ) == libforks_OK);
 
+  // Fails because the pipe is non-blocking and the child
+  // is currently sleeping.
   char c;
   check(read(pipe_fds[0], &c, 1) == -1);
   check(errno == EAGAIN);

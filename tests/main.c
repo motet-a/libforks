@@ -21,7 +21,7 @@ int main() {
 
     printf("testing %s...", entry->d_name);
     fflush(stdout);
-    char exec_path[strlen(entry->d_name) + 3];
+    char exec_path[64];
     check(snprintf(exec_path, sizeof exec_path, "./%s", entry->d_name) != -1);
 
     char *argv[] = {exec_path, NULL};

@@ -86,6 +86,7 @@ typedef enum {
   libforks_FORK_ERROR = -5,
   libforks_WAIT_ERROR = -6,
   libforks_CLOSE_ERROR = -7,
+  libforks_TOO_MANY_CLIENTS_ERROR = -8,
 } libforks_Result;
 // Error codes used by this library. In the future, more errors
 // can be added and values of existing errors may change.
@@ -250,7 +251,8 @@ int libforks_write_socket_fds(
     const int *fds, size_t fd_count);
 // Low-level utility functions that can be used to transfer PIDs between
 // arbitrary processes. These are a bit unrelated to the previous
-// functions. They are made available because they are used internally.
+// functions. They are made available because they are used internally
+// and can be useful for advanced users.
 //
 // `socket_fd` must be a UNIX socket file descriptor. These functions do
 // not work if `socket_fd` is a pipe or a regular file.
