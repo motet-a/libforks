@@ -50,6 +50,10 @@
 
 #define CMSG_BUFFER_SIZE (sizeof(int) * 32)
 
+// To make pipe(2) easier to understand
+#define READ_END 0
+#define WRITE_END 1
+
 
 // There’s a protocol between the fork server and its clients
 typedef enum {
@@ -418,7 +422,7 @@ static void serv_sigchld_handler(int sig_) {
       .pid = child_pid,
       .wait_status = status,
     };
-    if (safe_write(serv_exit_pipe[1], &event, sizeof event) == -1) {
+    if (safe_write(serv_exit_pipe[WRITE_END], &event, sizeof event) == -1) {
       serv_print_errno("write(2) system call in SIGCHLD handler");
       serv_panic();
     }
@@ -559,8 +563,8 @@ static void serv_handle_fork_request(
       free(client);
       client = next;
     }
-    close(serv_exit_pipe[0]);
-    close(serv_exit_pipe[1]);
+    close(serv_exit_pipe[READ_END]);
+    close(serv_exit_pipe[WRITE_END]);
 
     serv_uninstall_signal_handler(SIGTERM);
     serv_uninstall_signal_handler(SIGCHLD);
@@ -612,10 +616,9 @@ static void serv_handle_fork_request(
       serv_print_errno("pipe");
       serv_panic();
     }
-    client->exit_fd = exit_pipe[1];
+    client->exit_fd = exit_pipe[WRITE_END];
   }
   serv_DEBUG("created exit pipe {%d, %d}\n", exit_pipe[0], exit_pipe[1]);
-  int exit_out = exit_pipe[0];
 
   *first_client_ptr = client;
   (*client_count_ptr)++;
@@ -626,8 +629,8 @@ static void serv_handle_fork_request(
   if (parent_user_socket != -1) {
     fds_to_send[fd_count++] = parent_user_socket;
   }
-  if (exit_out != -1) {
-    fds_to_send[fd_count++] = exit_out;
+  if (exit_pipe[READ_END] != -1) {
+    fds_to_send[fd_count++] = exit_pipe[READ_END];
   }
 
   // Wait until the child is ready. This is necessary because if
@@ -650,8 +653,8 @@ static void serv_handle_fork_request(
     },
   };
   serv_send_fds(parent->socket, res, fds_to_send, fd_count);
-  if (exit_out != -1) {
-    close(exit_out);
+  if (exit_pipe[READ_END] != -1) {
+    close(exit_pipe[READ_END]);
   }
   if (parent_user_socket != -1) {
     close(parent_user_socket);
@@ -786,7 +789,7 @@ static void serv_main(serv_Client *first_client) {
 
     struct pollfd poll_fds[1 + serv_MAX_CLIENTS];
 
-    poll_fds[0].fd = serv_exit_pipe[0];
+    poll_fds[0].fd = serv_exit_pipe[READ_END];
     poll_fds[0].events = POLLIN | POLLPRI;
     poll_fds[0].revents = 0;
 
@@ -826,7 +829,7 @@ static void serv_main(serv_Client *first_client) {
       );
 
       libforks_ExitEvent event;
-      if (safe_read(serv_exit_pipe[0], &event, sizeof event) == -1) {
+      if (safe_read(serv_exit_pipe[READ_END], &event, sizeof event) == -1) {
         serv_print_errno("read");
         serv_panic();
       }
