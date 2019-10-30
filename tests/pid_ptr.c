@@ -1,6 +1,6 @@
 #include "./tests.h"
 
-int pipe_fds[2];
+static int pipe_fds[2];
 
 static void child_main(libforks_ServerConn conn, int socket_fd) {
   (void)socket_fd;

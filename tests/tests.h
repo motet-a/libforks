@@ -15,6 +15,7 @@
 
 #define check(e) ((void)(e ? (void)0 : check_failure(#e, __FILE__, __LINE__)))
 
+__attribute__((noreturn))
 static void check_failure(const char *assertion, const char *file, int line) {
   fprintf(stderr, "check \"%s\" failed in %s:%d\n", assertion, file, line);
   abort();

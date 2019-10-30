@@ -65,7 +65,6 @@ typedef enum {
 } ClientMessageType;
 
 typedef struct {
-  ClientMessageType type;
   union {
     struct {
       bool create_user_socket;
@@ -81,6 +80,7 @@ typedef struct {
       void (*function)(void);
     } eval_request;
   } u;
+  ClientMessageType type;
 } ClientMessage;
 
 typedef enum {
@@ -91,7 +91,6 @@ typedef enum {
 } ServerMessageType;
 
 typedef struct {
-  ServerMessageType type;
   union {
     struct {
       pid_t pid;
@@ -103,6 +102,7 @@ typedef struct {
       libforks_Result error_code;
     } fork_failure;
   } u;
+  ServerMessageType type;
 } ServerMessage;
 
 
@@ -444,6 +444,7 @@ static void serv_uninstall_signal_handler(int signal) {
   }
 }
 
+__attribute__((noreturn))
 static void serv_handle_stop_all_request(
     serv_Client *first_client,
     serv_Client *sender_client) {
@@ -491,6 +492,7 @@ static void serv_handle_stop_all_request(
   exit(0);
 }
 
+__attribute__((noreturn))
 static void serv_handle_stop_server_only_request(void) {
   serv_DEBUG("STOP_SERVER_ONLY_REQUEST received\n");
   exit(0);
@@ -742,7 +744,7 @@ static unsigned serv_connected_clients(const serv_Client *c) {
     c = c->next;
   }
   return count;
-};
+}
 
 // The main loop of the fork server.
 __attribute__((noreturn))
@@ -785,7 +787,7 @@ static void serv_main(serv_Client *first_client) {
   size_t client_count = 1;
 
   while (true) {
-    size_t fd_count = 1;
+    nfds_t fd_count = 1;
 
     struct pollfd poll_fds[1 + serv_MAX_CLIENTS];
 
@@ -801,8 +803,8 @@ static void serv_main(serv_Client *first_client) {
       assert(fd_count <= (sizeof(poll_fds) / sizeof(struct pollfd)));
       struct pollfd *pollfd = poll_fds + fd_count;
       pollfd->fd = c->socket;
-      pollfd->events = POLLIN | POLLPRI,
-      pollfd->revents = 0,
+      pollfd->events = POLLIN | POLLPRI;
+      pollfd->revents = 0;
       fd_count++;
     }
 
