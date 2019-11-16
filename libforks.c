@@ -163,7 +163,8 @@ static int checked_close(int fd) {
 #endif // NDEBUG
 
 
-static int safe_read(int fd, void *data, size_t length) {
+// Reads exactly `length` bytes
+static int read_exact(int fd, void *data, size_t length) {
   ssize_t res = read(fd, data, length);
   if (res == -1) {
     return -1;
@@ -175,7 +176,8 @@ static int safe_read(int fd, void *data, size_t length) {
   return 0;
 }
 
-static int safe_write(int fd, const void *data, size_t length) {
+// Writes exactly `length` bytes
+static int write_exact(int fd, const void *data, size_t length) {
   ssize_t res = write(fd, data, length);
   if (res == -1) {
     return -1;
@@ -197,7 +199,7 @@ int libforks_read_socket_fds(
   if (max_fd_count == 0) {
     // For some reason `sendmsg` fails with ENOMEM on macOS in this special
     // case. Weird. The workaround is dead simple:
-    return safe_read(socket_fd, data, length);
+    return read_exact(socket_fd, data, length);
   }
 
   struct iovec iovec = {
@@ -262,7 +264,7 @@ int libforks_write_socket_fds(
 
   if (fd_count == 0) {
     // Same macOS issue, same workaround:
-    return safe_write(socket_fd, data, length);
+    return write_exact(socket_fd, data, length);
   }
 
   struct iovec iovec = {
@@ -331,7 +333,7 @@ __attribute__((noreturn)) static void serv_panic() {
 }
 
 static void serv_send(int fd, ServerMessage msg) {
-  if (safe_write(fd, &msg, sizeof msg) == -1) {
+  if (write_exact(fd, &msg, sizeof msg) == -1) {
     serv_print_errno("write");
     serv_panic();
   }
@@ -356,7 +358,7 @@ static void serv_send_fds(
 static ClientMessage serv_recv(int fd) {
   ClientMessage msg;
 
-  if (safe_read(fd, &msg, sizeof msg) == -1) {
+  if (read_exact(fd, &msg, sizeof msg) == -1) {
     serv_print_errno("read");
     serv_panic();
   }
@@ -422,7 +424,7 @@ static void serv_sigchld_handler(int sig_) {
       .pid = child_pid,
       .wait_status = status,
     };
-    if (safe_write(serv_exit_pipe[WRITE_END], &event, sizeof event) == -1) {
+    if (write_exact(serv_exit_pipe[WRITE_END], &event, sizeof event) == -1) {
       serv_print_errno("write(2) system call in SIGCHLD handler");
       serv_panic();
     }
@@ -583,9 +585,9 @@ static void serv_handle_fork_request(
     libforks_ServerConn conn_p = {.private = child_conn};
 
     // Inform the parent that we are ready.
-    if (safe_write(child_socket, "r", 1) == -1) {
+    if (write_exact(child_socket, "r", 1) == -1) {
       // XXX not very correct as well
-      serv_print_errno("safe_write");
+      serv_print_errno("write_exact");
       serv_panic();
     }
 
@@ -640,8 +642,8 @@ static void serv_handle_fork_request(
   // process may not have uninstalled its SIGTERM handler yet and
   // may ignore the signal sent by libforks_stop().
   char ready_char;
-  if (safe_read(server_socket, &ready_char, 1) == -1 || ready_char != 'r') {
-    serv_print_errno("safe_read");
+  if (read_exact(server_socket, &ready_char, 1) == -1 || ready_char != 'r') {
+    serv_print_errno("read_exact");
     serv_panic();
   }
 
@@ -831,8 +833,8 @@ static void serv_main(serv_Client *first_client) {
       );
 
       libforks_ExitEvent event;
-      if (safe_read(serv_exit_pipe[READ_END], &event, sizeof event) == -1) {
-        serv_print_errno("read");
+      if (read_exact(serv_exit_pipe[READ_END], &event, sizeof event) == -1) {
+        serv_print_errno("read_exact");
         serv_panic();
       }
 
@@ -844,7 +846,7 @@ static void serv_main(serv_Client *first_client) {
 
       if (client->exit_fd != -1) {
         serv_DEBUG("informing parent that %d has exited\n", (int)event.pid);
-        if (safe_write(client->exit_fd, &event, sizeof event) == -1) {
+        if (write_exact(client->exit_fd, &event, sizeof event) == -1) {
           if (errno == EPIPE) {
             // Ignore the error because that’s pretty much normal and
             // expected, it happens if the client has closed the pipe
@@ -1008,7 +1010,7 @@ libforks_Result libforks_fork(
     },
   };
 
-  if (safe_write(conn->socket, &req, sizeof req) == -1) {
+  if (write_exact(conn->socket, &req, sizeof req) == -1) {
     return libforks_WRITE_ERROR;
   }
 
@@ -1066,7 +1068,7 @@ libforks_Result libforks_stop_server_only(libforks_ServerConn conn_p) {
     .type = ClientMessageType_STOP_SERVER_ONLY_REQUEST,
   };
 
-  if (safe_write(conn->socket, &req, sizeof req) == -1) {
+  if (write_exact(conn->socket, &req, sizeof req) == -1) {
     return libforks_WRITE_ERROR;
   }
 
@@ -1079,7 +1081,7 @@ libforks_Result libforks_stop(libforks_ServerConn conn_p) {
   ClientMessage req = {
     .type = ClientMessageType_STOP_ALL_REQUEST,
   };
-  if (safe_write(conn->socket, &req, sizeof req) == -1) {
+  if (write_exact(conn->socket, &req, sizeof req) == -1) {
     return libforks_WRITE_ERROR;
   }
 
@@ -1104,12 +1106,12 @@ libforks_Result libforks_kill_all(libforks_ServerConn conn_p, int signal) {
       },
     },
   };
-  if (safe_write(conn->socket, &req, sizeof req) == -1) {
+  if (write_exact(conn->socket, &req, sizeof req) == -1) {
     return libforks_WRITE_ERROR;
   }
 
   ServerMessage res;
-  if (safe_read(conn->socket, &res, sizeof res) == -1) {
+  if (read_exact(conn->socket, &res, sizeof res) == -1) {
     return libforks_READ_ERROR;
   }
 
@@ -1128,12 +1130,12 @@ libforks_Result libforks_eval(libforks_ServerConn conn_p, void (*function)(void)
       },
     },
   };
-  if (safe_write(conn->socket, &req, sizeof req) == -1) {
+  if (write_exact(conn->socket, &req, sizeof req) == -1) {
     return libforks_WRITE_ERROR;
   }
 
   ServerMessage res;
-  if (safe_read(conn->socket, &res, sizeof res) == -1) {
+  if (read_exact(conn->socket, &res, sizeof res) == -1) {
     return libforks_READ_ERROR;
   }
 
