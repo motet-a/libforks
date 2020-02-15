@@ -440,7 +440,7 @@ static void serv_uninstall_signal_handler(int signal) {
   sa.sa_handler = SIG_DFL;
   sa.sa_flags = 0;
   sigemptyset(&sa.sa_mask);
-  if (sigaction(signal, &sa, 0) == -1) {
+  if (sigaction(signal, &sa, NULL) == -1) {
     serv_print_errno(NULL);
     serv_panic();
   }
@@ -772,7 +772,7 @@ static void serv_main(serv_Client *first_client) {
   sa.sa_handler = SIG_IGN;
   sa.sa_flags = 0;
   sigemptyset(&sa.sa_mask);
-  if (sigaction(SIGTERM, &sa, 0) == -1) {
+  if (sigaction(SIGTERM, &sa, NULL) == -1) {
       serv_print_errno(NULL);
       serv_panic();
   }
