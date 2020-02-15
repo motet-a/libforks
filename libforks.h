@@ -22,8 +22,8 @@
 // setup UNIX sockets to communicate with the child and to transfer
 // file descriptors between arbitrary processes.
 //
-// Of course, this library is not a drop-in replacement for existing
-// calls to `fork(2)`.
+// Of course, this library is not a drop-in replacement for `fork(2)`.
+// It is similar but behaves differently.
 //
 // Fork servers are used in the real world by a few programs including
 // CPython and the Erlang Run-Time System, but they have their own
@@ -171,7 +171,7 @@ libforks_Result libforks_fork(
 //  - The new child process will not be a copy of the caller at
 //  the time when `libforks_fork` is called, but when `libforks_start`
 //  was called. In other words, `libforks_start` saves the state of
-//  the process and `libforks_fork` restores it.
+//  the process and `libforks_fork` restores it in a new process.
 //
 // You have to use `shutdown(2)` before `close(2)` on the socket if
 // you want the child process to detect that the socket is closed.
