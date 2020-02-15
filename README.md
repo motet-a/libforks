@@ -327,7 +327,7 @@ EMSGSIZE if the number of transfered bytes is lower than `length`.
 
 ```
 Copyright Ericsson AB 1996-2018. All Rights Reserved.
-Copyright 2019 Antoine Motet
+Copyright 2019-2020 Antoine Motet
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this library except in compliance with the License.
