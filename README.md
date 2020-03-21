@@ -62,6 +62,8 @@ typedef struct { void *private; } libforks_ServerConn;
 Represents a connection to a fork server. Must be initialized
 by `libforks_start` before being used in other functions.
 
+-----
+
 ```c
 typedef struct {
   pid_t pid; // Child process pid
@@ -301,6 +303,13 @@ Executes arbitrary code on the server.
 
 This is powerful but dangerous, use this only if you know what you
 are doing.
+
+Errors:
+- `libforks_WRITE_ERROR`: `write(2)` failed to send a message to the server
+- `libforks_READ_ERROR`: `read(2)` failed to receive a message from the server
+
+Unless set to zero, `errno` contains a lower-level description of
+the error.
 
 -----
 
