@@ -122,6 +122,7 @@ this function many times in order to start many different
 fork servers.
 
 Errors:
+
 - `libforks_SOCKET_CREATION_ERROR`: socketpair(2) failed
 - `libforks_FORK_ERROR`: fork(2) failed
 - `libforks_MALLOC_ERROR`: malloc(3) failed
@@ -190,6 +191,7 @@ This function is thread-safe, it is safe to use it concurrently
 with the same `libfork_ServerConn` shared between multiple threads.
 
 Errors:
+
 - `libforks_WRITE_ERROR`: `write(2)` failed to send a message to the server
 - `libforks_READ_ERROR`: `read(2)` failed to receive a message from the server
 - `libforks_READ_ERROR`: `read(2)` failed to receive a message from the server
@@ -219,6 +221,7 @@ from the process that started the fork server, otherwise it
 will deadlock.
 
 Errors:
+
 - `libforks_WRITE_ERROR`: `write(2)` failed to send a message to the server
 - `libforks_READ_ERROR`: `read(2)` failed to receive a message from the server
 
@@ -266,6 +269,7 @@ libforks_Result libforks_kill_all(libforks_ServerConn conn, int signal);
 Sends the given signal to any running children (except the caller).
 
 Errors:
+
 - `libforks_WRITE_ERROR`: `write(2)` failed to send a message to the server
 - `libforks_READ_ERROR`: `read(2)` failed to receive a message from the server
 
@@ -286,6 +290,7 @@ This function invalidates the given ServerConn. It must be called
 from the process that started the fork server.
 
 Errors:
+
 - `libforks_WRITE_ERROR`: `write(2)` failed to send a message to the server
 - `libforks_READ_ERROR`: `read(2)` failed to receive a message from the server
 
@@ -315,6 +320,7 @@ This is powerful but dangerous, use this only if you know what you
 are doing.
 
 Errors:
+
 - `libforks_WRITE_ERROR`: `write(2)` failed to send a message to the server
 - `libforks_READ_ERROR`: `read(2)` failed to receive a message from the server
 
