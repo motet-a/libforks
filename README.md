@@ -258,7 +258,7 @@ closed. Exit file descriptors will continue to work
 (i.e. the parent will be notified when this process will
 exit in anyway).
 
-This function never fails.
+This function never fails and always return `libforks_OK`.
 
 -----
 
