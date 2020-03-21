@@ -38,8 +38,17 @@
 // Symbols that are specific to the server have a name prefixed by serv_.
 
 
+// XXX `serv_DEBUG` is guaranteed to be async-signal-safe in two cases:
+//   - if you’re on a system where dprintf is async-signal-safe (it’s
+//   guaranteed on OpenBSD but not on Linux, even if dprintf is likely
+//   async-signal safe on any Unix system out there);
+//   - or, more commonly, if debugging is disabled (that should be almost
+//   always the case).
+//
+// Thus, this program assumes that `serv_DEBUG` is always async-signal-safe
+// even if POSIX disagrees.
 #ifdef LIBFORKS_DEBUG
-#  define serv_DEBUG(...) (fprintf(stderr, "libforks server: " __VA_ARGS__))
+#  define serv_DEBUG(...) (dprintf(STDERR_FILENO, "libforks server: " __VA_ARGS__))
 #else
 #  define serv_DEBUG(...)
 #endif
@@ -163,7 +172,7 @@ static int checked_close(int fd) {
 #endif // NDEBUG
 
 
-// Reads exactly `length` bytes
+// Reads exactly `length` bytes. Async-signal-safe.
 static int read_exact(int fd, void *data, size_t length) {
   ssize_t res = read(fd, data, length);
   if (res == -1) {
@@ -176,7 +185,7 @@ static int read_exact(int fd, void *data, size_t length) {
   return 0;
 }
 
-// Writes exactly `length` bytes
+// Writes exactly `length` bytes. Async-signal-safe.
 static int write_exact(int fd, const void *data, size_t length) {
   ssize_t res = write(fd, data, length);
   if (res == -1) {
@@ -306,12 +315,17 @@ int libforks_write_socket_fds(
   return 0;
 }
 
+// XXX Like `serv_DEBUG`, not exactly async-signal-safe but should be
+// okay. It’s only used in case of a fatal error.
+__attribute__((format(printf, 1, 2)))
 static void serv_print_error(const char *format, ...) {
   va_list ap;
   va_start(ap, format);
-  fprintf(stderr, "libforks server: ");
-  vfprintf(stderr, format, ap);
-  fprintf(stderr, "\n");
+  // XXX `dprintf` is guaranteed to be async-signal-safe on OpenBSD
+  // but not on other systems.
+  dprintf(STDERR_FILENO, "libforks server: ");
+  vdprintf(STDERR_FILENO, format, ap);
+  dprintf(STDERR_FILENO, "\n");
   va_end(ap);
 }
 
@@ -396,6 +410,10 @@ static serv_Client *serv_find_client_by_socket(serv_Client *l, int socket) {
 static void serv_sigchld_handler(int sig_) {
   (void)sig_;
 
+  // This function uses `serv_DEBUG` and `serv_print_errno` which
+  // could theoretically be async-signal-unsafe. But that’s only
+  // when debugging is enabled or if a fatal error occurs.
+
   int prev_errno = errno;
 
   // We know that some children have exited but we don’t know which ones.
@@ -457,7 +475,7 @@ static void serv_handle_stop_all_request(
     serv_print_error(
       "Deadlock detected!\n"
       "Some libforks functions must be called from the process "
-      "that started the fork server.\n"
+      "that started the fork server."
     );
     serv_panic();
   }
