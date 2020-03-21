@@ -196,7 +196,6 @@ libforks_Result libforks_fork(
 // Unless set to zero, `errno` contains a lower-level description of
 // the error.
 
-
 // -----
 
 libforks_Result libforks_stop(libforks_ServerConn conn);
@@ -218,6 +217,12 @@ libforks_Result libforks_stop(libforks_ServerConn conn);
 // Unless set to zero, `errno` contains a lower-level description of
 // the error.
 
+// -----
+
+const char *libforks_result_string(libforks_Result result);
+// Returns the name of the result code. For example,
+// `libforks_result_string(libforks_WRITE_ERROR)` will return a
+// pointer to the string `"WRITE_ERROR"`.
 
 // -----
 
@@ -250,7 +255,6 @@ libforks_Result libforks_kill_all(libforks_ServerConn conn, int signal);
 // Unless set to zero, `errno` contains a lower-level description of
 // the error.
 
-
 // -----
 
 libforks_Result libforks_stop_server_only(libforks_ServerConn conn);
@@ -267,7 +271,6 @@ libforks_Result libforks_stop_server_only(libforks_ServerConn conn);
 //
 // Unless set to zero, `errno` contains a lower-level description of
 // the error.
-
 
 // -----
 
@@ -330,6 +333,7 @@ int libforks_write_socket_fds(
 #endif                // no doc
 
 #endif // LIBFORKS_H_  // no doc
+
 
 // -----
 

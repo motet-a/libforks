@@ -1201,3 +1201,19 @@ libforks_Result libforks_eval(libforks_ServerConn conn_p, void (*function)(void)
   return libforks_OK;
 }
 
+
+const char *libforks_result_string(libforks_Result result) {
+  switch (result) {
+#define E(name) case libforks_##name: return #name;
+    E(OK)
+    E(READ_ERROR)
+    E(WRITE_ERROR)
+    E(SOCKET_CREATION_ERROR)
+    E(MALLOC_ERROR)
+    E(FORK_ERROR)
+    E(WAIT_ERROR)
+    E(TOO_MANY_CLIENTS_ERROR)
+  }
+  abort();
+}
+

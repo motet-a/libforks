@@ -227,6 +227,16 @@ the error.
 
 -----
 
+```c
+const char *libforks_result_string(libforks_Result result);
+```
+
+Returns the name of the result code. For example,
+`libforks_result_string(libforks_WRITE_ERROR)` will return a
+pointer to the string `"WRITE_ERROR"`.
+
+-----
+
 # Advanced functions
 
 ```c
