@@ -30,13 +30,21 @@ static void echo_upper_main(libforks_ServerConn conn, int socket_fd) {
   // not strictly required but recommended
   assert(libforks_free_conn(conn) == libforks_OK);
 
-  int out;
+  int out, ready_fd;
   char c;
   assert(libforks_read_socket_fds(socket_fd, &c, 1, &out, 1) == 0);
-  assert(c == 'r');
+  assert(c == 'a');
+  assert(libforks_read_socket_fds(socket_fd, &c, 1, &ready_fd, 1) == 0);
+  assert(c == 'b');
 
   assert(dup2(socket_fd, STDIN_FILENO) != -1);
   assert(dup2(out, STDOUT_FILENO) != -1);
+  close(socket_fd);
+  close(out);
+
+  // Inform the parent process that we’re ready to receive input
+  assert(write(ready_fd, "c", 1) == 1);
+  close(ready_fd);
 
   execlp("tr", "tr", "[:lower:]", "[:upper:]", NULL); // uppercase!
   perror("execlp");
@@ -55,14 +63,23 @@ static void echo_upper(const char *text) {
     echo_upper_main
   ) == libforks_OK);
 
-  assert(libforks_write_socket_fds(socket_fd, "r", 1, &threads_output_fd, 1) == 0);
+  int ready_pipe[2];
+  assert(pipe(ready_pipe) == 0);
+
+  assert(libforks_write_socket_fds(socket_fd, "a", 1, &threads_output_fd, 1) == 0);
+  assert(libforks_write_socket_fds(socket_fd, "b", 1, &ready_pipe[1], 1) == 0);
+
+  // wait until the child process finishes to setup its file descriptors
+  char c;
+  assert(read(ready_pipe[0], &c, 1) == 1);
+  close(ready_pipe[0]);
+  close(ready_pipe[1]);
 
   assert(write(socket_fd, text, strlen(text)) == (ssize_t)strlen(text));
-  int r = shutdown(socket_fd, SHUT_RDWR);
-  if (r == -1) {
-    // ENOTCONN happens if the other end is already closed
-    assert(errno == ENOTCONN);
-  }
+
+  // `shutdown` is necessary here to send EOF
+  int r = shutdown(socket_fd, SHUT_WR);
+  assert(r == 0);
   assert(close(socket_fd) == 0);
 
   libforks_ExitEvent ee;
@@ -116,7 +133,7 @@ int main() {
   assert(pthread_join(buzzer, &res) == 0);
 
   // `shutdown` is necessary here to send EOF to sort’s stdin
-  assert(shutdown(threads_output_fd, SHUT_RDWR) == 0);
+  assert(shutdown(threads_output_fd, SHUT_WR) == 0);
   assert(close(threads_output_fd) == 0);
 
   // `sort` exits here, the fork server receives SIGCHLD and writes
