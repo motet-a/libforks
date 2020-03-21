@@ -220,7 +220,8 @@ int libforks_read_socket_fds(
   size_t cmsg_buffer_space = CMSG_SPACE(sizeof(int) * max_fd_count);
 
   if (cmsg_buffer_space > sizeof cmsg_buffer) {
-    return ENOMEM;
+    errno = ENOMEM;
+    return -1;
   }
 
   memset(cmsg_buffer, 0, cmsg_buffer_space);
@@ -285,7 +286,8 @@ int libforks_write_socket_fds(
   size_t cmsg_buffer_space = CMSG_SPACE(sizeof(int) * fd_count);
 
   if (cmsg_buffer_space > sizeof cmsg_buffer) {
-    return ENOMEM;
+    errno = ENOMEM;
+    return -1;
   }
 
   memset(cmsg_buffer, 0, cmsg_buffer_space);
