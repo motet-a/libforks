@@ -23,7 +23,7 @@ build_and_test() {
   CFLAGS="$CFLAGS -Dserv_MAX_CLIENTS=20" # for tests/too_many_clients.c
   #CFLAGS="$CFLAGS -fsanitize=address"
 
-  for p in $(test_paths)  $(example_paths)
+  for p in $(test_paths) $(example_paths)
   do
     cc $CFLAGS -o "${p}" "${p}.c" libforks.c
   done
