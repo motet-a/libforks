@@ -124,6 +124,9 @@ Errors:
 - `libforks_FORK_ERROR`: fork(2) failed
 - `libforks_MALLOC_ERROR`: malloc(3) failed
 
+Unless set to zero, `errno` contains a lower-level description of
+the error.
+
 -----
 
 ```c
@@ -190,6 +193,11 @@ Errors:
 - `libforks_READ_ERROR`: `read(2)` failed to receive a message from the server
 - `libforks_TOO_MANY_CLIENTS_ERROR`: the maximum number of processes connected
 to the server has been reached
+- `libforks_SOCKET_CREATION_ERROR`: failed to create a socket pair
+- `libforks_FORK_ERROR`: the `fork(2)` system call failed
+
+Unless set to zero, `errno` contains a lower-level description of
+the error.
 
 -----
 
@@ -211,6 +219,9 @@ will deadlock.
 Errors:
 - `libforks_WRITE_ERROR`: `write(2)` failed to send a message to the server
 - `libforks_READ_ERROR`: `read(2)` failed to receive a message from the server
+
+Unless set to zero, `errno` contains a lower-level description of
+the error.
 
 -----
 
@@ -246,6 +257,9 @@ Errors:
 - `libforks_WRITE_ERROR`: `write(2)` failed to send a message to the server
 - `libforks_READ_ERROR`: `read(2)` failed to receive a message from the server
 
+Unless set to zero, `errno` contains a lower-level description of
+the error.
+
 -----
 
 ```c
@@ -262,6 +276,9 @@ from the process that started the fork server.
 Errors:
 - `libforks_WRITE_ERROR`: `write(2)` failed to send a message to the server
 - `libforks_READ_ERROR`: `read(2)` failed to receive a message from the server
+
+Unless set to zero, `errno` contains a lower-level description of
+the error.
 
 -----
 

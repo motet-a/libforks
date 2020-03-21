@@ -121,6 +121,9 @@ libforks_Result libforks_start(libforks_ServerConn *conn_ptr);
 // - `libforks_SOCKET_CREATION_ERROR`: socketpair(2) failed
 // - `libforks_FORK_ERROR`: fork(2) failed
 // - `libforks_MALLOC_ERROR`: malloc(3) failed
+//
+// Unless set to zero, `errno` contains a lower-level description of
+// the error.
 
 // -----
 
@@ -185,6 +188,12 @@ libforks_Result libforks_fork(
 // - `libforks_READ_ERROR`: `read(2)` failed to receive a message from the server
 // - `libforks_TOO_MANY_CLIENTS_ERROR`: the maximum number of processes connected
 //    to the server has been reached
+// - `libforks_SOCKET_CREATION_ERROR`: failed to create a socket pair
+// - `libforks_FORK_ERROR`: the `fork(2)` system call failed
+//
+// Unless set to zero, `errno` contains a lower-level description of
+// the error.
+
 
 // -----
 
@@ -203,6 +212,9 @@ libforks_Result libforks_stop(libforks_ServerConn conn);
 // Errors:
 // - `libforks_WRITE_ERROR`: `write(2)` failed to send a message to the server
 // - `libforks_READ_ERROR`: `read(2)` failed to receive a message from the server
+//
+// Unless set to zero, `errno` contains a lower-level description of
+// the error.
 
 
 // -----
@@ -232,6 +244,10 @@ libforks_Result libforks_kill_all(libforks_ServerConn conn, int signal);
 // Errors:
 // - `libforks_WRITE_ERROR`: `write(2)` failed to send a message to the server
 // - `libforks_READ_ERROR`: `read(2)` failed to receive a message from the server
+//
+// Unless set to zero, `errno` contains a lower-level description of
+// the error.
+
 
 // -----
 
@@ -246,6 +262,9 @@ libforks_Result libforks_stop_server_only(libforks_ServerConn conn);
 // Errors:
 // - `libforks_WRITE_ERROR`: `write(2)` failed to send a message to the server
 // - `libforks_READ_ERROR`: `read(2)` failed to receive a message from the server
+//
+// Unless set to zero, `errno` contains a lower-level description of
+// the error.
 
 
 // -----
