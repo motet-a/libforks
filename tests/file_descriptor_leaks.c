@@ -17,7 +17,6 @@ static void child_main(libforks_ServerConn conn, int socket_fd) {
 
 int main() {
   struct rlimit l;
-  check(getrlimit(RLIMIT_NOFILE, &l) == 0);
   l.rlim_cur = l.rlim_max = 9;
   check(setrlimit(RLIMIT_NOFILE, &l) == 0);
 

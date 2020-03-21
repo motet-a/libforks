@@ -546,8 +546,17 @@ static void serv_handle_fork_request(
 
   int sockets[2]; // for private child-server communication
   if (socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) == -1) {
-    serv_print_errno("socketpair");
-    serv_panic();
+    ServerMessage res = {
+      .type = ServerMessageType_FORK_FAILURE,
+      .u = {
+        .fork_failure = {
+          .error_code = libforks_SOCKET_CREATION_ERROR,
+          .saved_errno = errno,
+        },
+      },
+    };
+    serv_send(parent->socket, res);
+    return;
   }
   int server_socket = sockets[0]; // server end
   int child_socket = sockets[1]; // child end
@@ -555,8 +564,17 @@ static void serv_handle_fork_request(
   int user_sockets[2] = {-1, -1}; // for public parent-child communication
   if (req->u.fork_request.create_user_socket) {
     if (socketpair(AF_UNIX, SOCK_STREAM, 0, user_sockets) == -1) {
-      serv_print_errno("socketpair");
-      serv_panic();
+      ServerMessage res = {
+        .type = ServerMessageType_FORK_FAILURE,
+        .u = {
+          .fork_failure = {
+            .error_code = libforks_SOCKET_CREATION_ERROR,
+            .saved_errno = errno,
+          },
+        },
+      };
+      serv_send(parent->socket, res);
+      goto destroy_socket;
     }
   }
   int parent_user_socket = user_sockets[0]; // parent end
@@ -564,8 +582,17 @@ static void serv_handle_fork_request(
 
   pid_t child_pid = fork();
   if (child_pid == -1) {
-    serv_print_errno("fork");
-    serv_panic();
+    ServerMessage res = {
+      .type = ServerMessageType_FORK_FAILURE,
+      .u = {
+        .fork_failure = {
+          .error_code = libforks_FORK_ERROR,
+          .saved_errno = errno,
+        },
+      },
+    };
+    serv_send(parent->socket, res);
+    goto destroy_user_socket;
   }
 
   if (child_pid == 0) {
@@ -685,6 +712,14 @@ static void serv_handle_fork_request(
   if (parent_user_socket != -1) {
     close(parent_user_socket);
   }
+  return;
+
+destroy_user_socket:
+  close(parent_user_socket);
+  close(child_user_socket);
+destroy_socket:
+  close(server_socket);
+  close(child_socket);
 }
 
 static void serv_handle_kill_all_request(
