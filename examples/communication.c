@@ -13,6 +13,8 @@
 static void child_main(libforks_ServerConn conn, int socket_fd) {
   (void)conn;
 
+  // We could use seccomp(2) (on Linux) or pledge(2) (on OpenBSD) here.
+
   while (true) {
     char c;
     assert(read(socket_fd, &c, 1) == 1);
