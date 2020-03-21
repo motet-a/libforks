@@ -1,6 +1,5 @@
 #include "./tests.h"
 #include <sys/dir.h>
-#include <errno.h>
 
 // Test runner program.
 

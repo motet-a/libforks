@@ -1,7 +1,6 @@
 #include "./tests.h"
 
 #include <time.h>
-#include <errno.h>
 
 int pipe_fds[2];
 

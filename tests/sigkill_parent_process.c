@@ -1,7 +1,5 @@
 #include "./tests.h"
 
-#include <errno.h>
-
 static int pipe_fds[2];
 
 static void parent_main(void) {

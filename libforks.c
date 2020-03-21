@@ -109,6 +109,7 @@ typedef struct {
 
     struct {
       libforks_Result error_code;
+      int saved_errno;
     } fork_failure;
   } u;
   ServerMessageType type;
@@ -533,6 +534,7 @@ static void serv_handle_fork_request(
       .u = {
         .fork_failure = {
           .error_code = libforks_TOO_MANY_CLIENTS_ERROR,
+          .saved_errno = 0,
         },
       },
     };
@@ -1047,6 +1049,7 @@ libforks_Result libforks_fork(
 
   if (res.type == ServerMessageType_FORK_FAILURE) {
     assert(res.u.fork_failure.error_code != libforks_OK);
+    errno = res.u.fork_failure.saved_errno;
     return res.u.fork_failure.error_code;
   }
 

@@ -24,6 +24,7 @@ int main() {
     check(r == libforks_OK);
   }
 
+  errno = ENOENT;
   libforks_Result r = libforks_fork(
     conn,
     NULL, // pid_ptr
@@ -31,6 +32,7 @@ int main() {
     NULL, // exit_fd_ptr
     child_main
   );
+  check(errno == 0);
   check(r == libforks_TOO_MANY_CLIENTS_ERROR);
 
   check(libforks_stop(conn) == libforks_OK);
