@@ -1,5 +1,6 @@
 #include <libforks.h>
 #include <assert.h>
+#include <errno.h>
 #include <stdlib.h>
 #include <pthread.h>
 #include <sys/socket.h>
@@ -57,7 +58,11 @@ static void echo_upper(const char *text) {
   assert(libforks_write_socket_fds(socket_fd, "r", 1, &threads_output_fd, 1) == 0);
 
   assert(write(socket_fd, text, strlen(text)) == (ssize_t)strlen(text));
-  assert(shutdown(socket_fd, SHUT_RDWR) == 0);
+  int r = shutdown(socket_fd, SHUT_RDWR);
+  if (r == -1) {
+    // ENOTCONN happens if the other end is already closed
+    assert(errno == ENOTCONN);
+  }
   assert(close(socket_fd) == 0);
 
   libforks_ExitEvent ee;
@@ -110,9 +115,13 @@ int main() {
   assert(pthread_join(fizzer, &res) == 0);
   assert(pthread_join(buzzer, &res) == 0);
 
-  // `shutdown` is necessary here
+  // `shutdown` is necessary here to send EOF to sort’s stdin
   assert(shutdown(threads_output_fd, SHUT_RDWR) == 0);
   assert(close(threads_output_fd) == 0);
+
+  // `sort` exits here, the fork server receives SIGCHLD and writes
+  // the exit event to `exit_fd`. The event stays in the `exit_fd`
+  // buffer until we read it so there’s no race condition.
 
   libforks_ExitEvent ee;
   assert(read(exit_fd, &ee, sizeof ee) == sizeof ee);
