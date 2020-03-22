@@ -18,7 +18,7 @@ clean() {
 
 
 build_and_test() {
-  CFLAGS="$CFLAGS -W -Wall -Wvla -std=c99 -I. -lpthread"
+  CFLAGS="$CFLAGS -W -Wextra -Wall -Wvla -std=c99 -I. -lpthread"
   CFLAGS="$CFLAGS -g"
   CFLAGS="$CFLAGS -Dserv_MAX_CLIENTS=20" # for tests/too_many_clients.c
   #CFLAGS="$CFLAGS -fsanitize=address"
