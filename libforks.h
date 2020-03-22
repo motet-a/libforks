@@ -100,6 +100,7 @@ typedef enum {
 
 // -----
 
+__attribute__((warn_unused_result)) // no doc
 libforks_Result libforks_start(libforks_ServerConn *conn_ptr);
 // Starts a new fork server.
 //
@@ -130,6 +131,7 @@ libforks_Result libforks_start(libforks_ServerConn *conn_ptr);
 
 // -----
 
+__attribute__((warn_unused_result)) // no doc
 libforks_Result libforks_fork(
   libforks_ServerConn conn,
   pid_t *pid_ptr, // out
@@ -222,6 +224,7 @@ libforks_Result libforks_stop(libforks_ServerConn conn);
 
 // -----
 
+__attribute__((warn_unused_result)) // no doc
 const char *libforks_result_string(libforks_Result result);
 // Returns the name of the result code. For example,
 // `libforks_result_string(libforks_WRITE_ERROR)` will return a
@@ -248,6 +251,7 @@ libforks_Result libforks_free_conn(libforks_ServerConn conn);
 
 // -----
 
+__attribute__((warn_unused_result)) // no doc
 libforks_Result libforks_kill_all(libforks_ServerConn conn, int signal);
 // Sends the given signal to any running children (except the caller).
 //
@@ -261,6 +265,7 @@ libforks_Result libforks_kill_all(libforks_ServerConn conn, int signal);
 
 // -----
 
+__attribute__((warn_unused_result)) // no doc
 libforks_Result libforks_stop_server_only(libforks_ServerConn conn);
 // Stops the fork server. Does not stop running children!
 //
@@ -284,6 +289,7 @@ pid_t libforks_get_server_pid(libforks_ServerConn conn);
 
 // -----
 
+__attribute__((warn_unused_result)) // no doc
 libforks_Result libforks_eval(
   libforks_ServerConn conn_p,
   void (*function)(void)
@@ -303,11 +309,13 @@ libforks_Result libforks_eval(
 
 // -----
 
+__attribute__((warn_unused_result)) // no doc
 int libforks_read_socket_fds(
     int socket_fd,
     void *data, size_t length,
     int *fds, size_t max_fd_count);
 
+__attribute__((warn_unused_result)) // no doc
 int libforks_write_socket_fds(
     int socket_fd,
     void *data, size_t length,

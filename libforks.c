@@ -174,6 +174,7 @@ static int checked_close(int fd) {
 
 
 // Reads exactly `length` bytes. Async-signal-safe.
+__attribute__((warn_unused_result))
 static int read_exact(int fd, void *data, size_t length) {
   ssize_t res = read(fd, data, length);
   if (res == -1) {
@@ -187,6 +188,7 @@ static int read_exact(int fd, void *data, size_t length) {
 }
 
 // Writes exactly `length` bytes. Async-signal-safe.
+__attribute__((warn_unused_result))
 static int write_exact(int fd, const void *data, size_t length) {
   ssize_t res = write(fd, data, length);
   if (res == -1) {
