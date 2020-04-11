@@ -219,7 +219,7 @@ int libforks_read_socket_fds(
     .iov_len = length,
   };
 
-  char cmsg_buffer[CMSG_BUFFER_SIZE];
+  char cmsg_buffer[CMSG_BUFFER_SIZE] = {0};
   size_t cmsg_buffer_space = CMSG_SPACE(sizeof(int) * max_fd_count);
 
   if (cmsg_buffer_space > sizeof cmsg_buffer) {
@@ -227,10 +227,7 @@ int libforks_read_socket_fds(
     return -1;
   }
 
-  memset(cmsg_buffer, 0, cmsg_buffer_space);
-
-  struct msghdr msg;
-  memset(&msg, 0, sizeof(msg));
+  struct msghdr msg = {0};
   msg.msg_iov = &iovec;
   msg.msg_iovlen = 1;
   msg.msg_control = cmsg_buffer;
@@ -285,7 +282,7 @@ int libforks_write_socket_fds(
     .iov_len = length,
   };
 
-  char cmsg_buffer[CMSG_BUFFER_SIZE];
+  char cmsg_buffer[CMSG_BUFFER_SIZE] = {0};
   size_t cmsg_buffer_space = CMSG_SPACE(sizeof(int) * fd_count);
 
   if (cmsg_buffer_space > sizeof cmsg_buffer) {
@@ -293,10 +290,7 @@ int libforks_write_socket_fds(
     return -1;
   }
 
-  memset(cmsg_buffer, 0, cmsg_buffer_space);
-
-  struct msghdr msg;
-  memset(&msg, 0, sizeof(msg));
+  struct msghdr msg = {0};
   msg.msg_iov = &iovec;
   msg.msg_iovlen = 1;
   msg.msg_control = cmsg_buffer;
@@ -1218,4 +1212,3 @@ const char *libforks_result_string(libforks_Result result) {
   }
   abort();
 }
-
